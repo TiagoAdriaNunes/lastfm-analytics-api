@@ -13,6 +13,19 @@ RATE_LIMIT_ERROR = 29
 RETRYABLE_ERRORS = {8, 11, 16, RATE_LIMIT_ERROR}
 SIGNED_METHODS = {"auth.getSession", "track.scrobble"}
 
+# Last.fm decodes the `artist`/`track` params of these methods twice, so a correctly encoded "+"
+# (%2B) turns into a space: "+44" is not found and "Florence + The Machine" silently resolves to
+# an empty "Florence   The Machine" page. Pre-encoding "+" as "%2B" survives the extra decode.
+# Other methods (e.g. album.getInfo, artist.search) decode once and must not get this.
+# See https://github.com/navidrome/navidrome/pull/6158
+DOUBLE_DECODED_METHODS = {
+    "artist.getInfo",
+    "artist.getSimilar",
+    "artist.getTopTracks",
+    "track.getSimilar",
+}
+DOUBLE_DECODED_PARAMS = {"artist", "track"}
+
 
 class LastFMError(Exception):
     def __init__(self, code: int, message: str) -> None:
@@ -53,6 +66,9 @@ class LastFMClient:
         query |= {"method": method, "api_key": self._api_key, "format": "json"}
         if method in SIGNED_METHODS:
             query["api_sig"] = create_signature(query, self._api_secret)
+        if method in DOUBLE_DECODED_METHODS:
+            for key in DOUBLE_DECODED_PARAMS & query.keys():
+                query[key] = str(query[key]).replace("+", "%2B")
 
         for attempt in range(self._max_retries + 1):
             try:
