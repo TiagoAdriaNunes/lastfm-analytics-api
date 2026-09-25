@@ -47,7 +47,7 @@ async def test_does_not_retry_non_retryable_errors(lastfm_mock):
 def test_rate_limited_returns_503_after_retries(client, lastfm_mock):
     route = lastfm_mock.respond(return_value=RATE_LIMITED)
 
-    response = client.get("/artists/A/similar")
+    response = client.get("/artists/similar", params={"artist": "A"})
 
     assert response.status_code == 503
     assert response.headers["Retry-After"] == "60"
@@ -66,10 +66,10 @@ def test_network_rate_limited_on_second_level_returns_503(client, lastfm_mock):
             httpx2.Response(200, json=first) if req.url.params["artist"] == "A" else RATE_LIMITED
         )
     )
-    assert client.get("/artists/A/similar/network").status_code == 503
+    assert client.get("/artists/similar/network", params={"artist": "A"}).status_code == 503
 
 
 def test_user_agent_is_sent(client, lastfm_mock):
     route = lastfm_mock.respond(return_value=httpx2.Response(200, json=MOCK_RESPONSE))
-    client.get("/artists/A/similar")
+    client.get("/artists/similar", params={"artist": "A"})
     assert route.last_request.headers["User-Agent"].startswith("lastfm-analytics-api/")

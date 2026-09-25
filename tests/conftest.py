@@ -3,8 +3,8 @@ import os
 os.environ.setdefault("LASTFM_API_KEY", "test-key")
 os.environ.setdefault("LASTFM_API_SECRET", "test-secret")
 # Keep tests fast: effectively no pacing and no retry sleeps.
-os.environ["LASTFM_RATE_LIMIT"] = "1000"
-os.environ["LASTFM_RETRY_BACKOFF"] = "0"
+os.environ["LASTFM__RATE_LIMIT"] = "1000"
+os.environ["LASTFM__RETRY_BACKOFF"] = "0"
 
 from collections.abc import Callable, Iterable  # noqa: E402
 from typing import Self  # noqa: E402
@@ -73,7 +73,7 @@ def client(lastfm_mock: LastFMMock):
         # (base URL, headers such as User-Agent).
         real = app.state.http_client
         app.state.http_client = httpx2.AsyncClient(
-            base_url=get_settings().lastfm_base_url,
+            base_url=get_settings().lastfm.base_url,
             headers=real.headers,
             transport=lastfm_mock.transport,
         )

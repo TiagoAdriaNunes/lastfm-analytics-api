@@ -14,14 +14,14 @@ from app.services.cache import TTLCache
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     async with httpx2.AsyncClient(
-        base_url=settings.lastfm_base_url,
-        timeout=settings.lastfm_timeout,
-        headers={"User-Agent": settings.user_agent},
+        base_url=settings.lastfm.base_url,
+        timeout=settings.http.timeout,
+        headers={"User-Agent": settings.http.user_agent},
     ) as client:
         app.state.http_client = client
-        app.state.lastfm_cache = TTLCache(ttl=settings.lastfm_cache_ttl)
+        app.state.lastfm_cache = TTLCache(ttl=settings.lastfm.cache_ttl)
         # One call every 1/rate seconds, shared by every request (max_rate=1 disables bursts).
-        app.state.lastfm_limiter = AsyncLimiter(1, 1 / settings.lastfm_rate_limit)
+        app.state.lastfm_limiter = AsyncLimiter(1, 1 / settings.lastfm.rate_limit)
         yield
 
 
