@@ -1,4 +1,4 @@
-import httpx
+import httpx2
 
 from app.schemas.artist import SimilarArtist, SimilarArtistsResponse
 from app.services.similar_network import build_similar_network
@@ -61,11 +61,11 @@ def test_build_network_skips_failed_second_level():
 
 def test_network_endpoint(client, lastfm_mock):
     responses = {
-        "Artist A": httpx.Response(200, json=lastfm_payload("Artist A", ("B", 0.9), ("C", 0.7))),
-        "B": httpx.Response(200, json=lastfm_payload("B", ("D", 0.8))),
-        "C": httpx.Response(200, json={"error": 6, "message": "not found"}),
+        "Artist A": httpx2.Response(200, json=lastfm_payload("Artist A", ("B", 0.9), ("C", 0.7))),
+        "B": httpx2.Response(200, json=lastfm_payload("B", ("D", 0.8))),
+        "C": httpx2.Response(200, json={"error": 6, "message": "not found"}),
     }
-    lastfm_mock.get("").mock(side_effect=lambda req: responses[req.url.params["artist"]])
+    lastfm_mock.respond(side_effect=lambda req: responses[req.url.params["artist"]])
 
     response = client.get("/artists/Artist A/similar/network", params={"limit": 2})
 
@@ -75,11 +75,11 @@ def test_network_endpoint(client, lastfm_mock):
     assert [n["name"] for n in body["nodes"]] == ["Artist A", "B", "C", "D"]
     assert body["edges"][0] == {"from": 1, "to": 2, "weight": 0.9}
     assert len(body["edges"]) == 3
-    assert all(c.request.url.params["limit"] == "2" for c in lastfm_mock.calls)
+    assert all(c.url.params["limit"] == "2" for c in lastfm_mock.requests)
 
 
 def test_network_endpoint_main_artist_not_found(client, lastfm_mock):
-    lastfm_mock.get("").mock(
-        return_value=httpx.Response(200, json={"error": 6, "message": "not found"})
+    lastfm_mock.respond(
+        return_value=httpx2.Response(200, json={"error": 6, "message": "not found"})
     )
     assert client.get("/artists/nope/similar/network").status_code == 404

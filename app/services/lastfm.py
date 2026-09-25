@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 from typing import Any
 
-import httpx
+import httpx2
 from aiolimiter import AsyncLimiter
 
 from app.services.cache import TTLCache
@@ -32,7 +32,7 @@ def create_signature(params: dict[str, Any], secret: str) -> str:
 class LastFMClient:
     def __init__(
         self,
-        http: httpx.AsyncClient,
+        http: httpx2.AsyncClient,
         api_key: str,
         api_secret: str = "",
         cache: TTLCache | None = None,

@@ -1,7 +1,7 @@
 from collections.abc import Awaitable
 from typing import Annotated
 
-import httpx
+import httpx2
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.dependencies import LastFMDep
@@ -29,7 +29,7 @@ async def _call_lastfm[T](coro: Awaitable[T]) -> T:
                 status.HTTP_503_SERVICE_UNAVAILABLE, exc.message, headers={"Retry-After": "60"}
             ) from exc
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, exc.message) from exc
-    except httpx.HTTPError as exc:
+    except httpx2.HTTPError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Last.fm request failed") from exc
 
 
