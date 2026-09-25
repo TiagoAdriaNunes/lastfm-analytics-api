@@ -1,6 +1,6 @@
 import asyncio
 
-import httpx
+import httpx2
 
 from app.schemas.artist import (
     NetworkEdge,
@@ -73,7 +73,7 @@ async def fetch_similar_network(
             if exc.code == RATE_LIMIT_ERROR:
                 raise
             return None
-        except (httpx.HTTPError, ValueError):
+        except (httpx2.HTTPError, ValueError):
             return None
 
     names = [a.name for a in first_level.similar]

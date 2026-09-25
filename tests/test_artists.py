@@ -1,10 +1,10 @@
-import httpx
+import httpx2
 
 from tests.test_lastfm import MOCK_RESPONSE
 
 
 def test_similar_artists(client, lastfm_mock):
-    route = lastfm_mock.get("").mock(return_value=httpx.Response(200, json=MOCK_RESPONSE))
+    route = lastfm_mock.respond(return_value=httpx2.Response(200, json=MOCK_RESPONSE))
 
     response = client.get("/artists/Artist A/similar", params={"limit": 2})
 
@@ -12,7 +12,7 @@ def test_similar_artists(client, lastfm_mock):
     body = response.json()
     assert body["artist"] == "Artist A"
     assert [a["name"] for a in body["similar"]] == ["Artist B", "Artist C"]
-    sent = route.calls.last.request.url.params
+    sent = route.last_request.url.params
     assert sent["method"] == "artist.getSimilar"
     assert sent["artist"] == "Artist A"
     assert sent["limit"] == "2"
@@ -20,8 +20,8 @@ def test_similar_artists(client, lastfm_mock):
 
 
 def test_similar_artists_not_found(client, lastfm_mock):
-    lastfm_mock.get("").mock(
-        return_value=httpx.Response(
+    lastfm_mock.respond(
+        return_value=httpx2.Response(
             200, json={"error": 6, "message": "The artist you supplied could not be found"}
         )
     )
@@ -33,8 +33,8 @@ def test_similar_artists_not_found(client, lastfm_mock):
 
 
 def test_similar_artists_upstream_error(client, lastfm_mock):
-    lastfm_mock.get("").mock(
-        return_value=httpx.Response(403, json={"error": 10, "message": "Invalid API key"})
+    lastfm_mock.respond(
+        return_value=httpx2.Response(403, json={"error": 10, "message": "Invalid API key"})
     )
 
     response = client.get("/artists/anyone/similar")

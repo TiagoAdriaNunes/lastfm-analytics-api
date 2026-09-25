@@ -50,6 +50,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      # Last.fm is mocked with respx, so no API secrets are needed here.
+      # Last.fm is mocked (tests/conftest.py), so no API secrets are needed here.
       - name: Run tests
         run: uv run pytest -v

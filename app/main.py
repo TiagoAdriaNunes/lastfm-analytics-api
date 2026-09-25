@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-import httpx
+import httpx2
 from aiolimiter import AsyncLimiter
 from fastapi import FastAPI
 
@@ -13,7 +13,7 @@ from app.services.cache import TTLCache
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    async with httpx.AsyncClient(
+    async with httpx2.AsyncClient(
         base_url=settings.lastfm_base_url,
         timeout=settings.lastfm_timeout,
         headers={"User-Agent": settings.user_agent},
