@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SimilarArtist(BaseModel):
@@ -30,3 +30,24 @@ def parse_similar_artists(data: dict[str, Any]) -> SimilarArtistsResponse:
             for a in artists
         ],
     )
+
+
+class NetworkNode(BaseModel):
+    id: int
+    name: str
+    level: int  # 0 = searched artist, 1 = similar, 2 = similar of similar
+    url: str | None = None
+
+
+class NetworkEdge(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    source: int = Field(alias="from")
+    target: int = Field(alias="to")
+    weight: float
+
+
+class SimilarArtistsNetwork(BaseModel):
+    artist: str
+    nodes: list[NetworkNode]
+    edges: list[NetworkEdge]

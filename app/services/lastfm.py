@@ -1,10 +1,16 @@
+import asyncio
 import hashlib
 from typing import Any
 
 import httpx
+from aiolimiter import AsyncLimiter
+
+from app.services.cache import TTLCache
 
 # Last.fm error codes: https://www.last.fm/api/errorcodes
 NOT_FOUND_ERROR = 6
+RATE_LIMIT_ERROR = 29
+RETRYABLE_ERRORS = {8, 11, 16, RATE_LIMIT_ERROR}
 SIGNED_METHODS = {"auth.getSession", "track.scrobble"}
 
 
@@ -24,10 +30,23 @@ def create_signature(params: dict[str, Any], secret: str) -> str:
 
 
 class LastFMClient:
-    def __init__(self, http: httpx.AsyncClient, api_key: str, api_secret: str = "") -> None:
+    def __init__(
+        self,
+        http: httpx.AsyncClient,
+        api_key: str,
+        api_secret: str = "",
+        cache: TTLCache | None = None,
+        limiter: AsyncLimiter | None = None,
+        max_retries: int = 0,
+        retry_backoff: float = 1.0,
+    ) -> None:
         self._http = http
         self._api_key = api_key
         self._api_secret = api_secret
+        self._cache = cache
+        self._limiter = limiter
+        self._max_retries = max_retries
+        self._retry_backoff = retry_backoff
 
     async def call(self, method: str, **params: Any) -> dict[str, Any]:
         query = {k: v for k, v in params.items() if v is not None}
@@ -35,8 +54,24 @@ class LastFMClient:
         if method in SIGNED_METHODS:
             query["api_sig"] = create_signature(query, self._api_secret)
 
+        for attempt in range(self._max_retries + 1):
+            try:
+                return await self._request(query)
+            except LastFMError as exc:
+                if exc.code not in RETRYABLE_ERRORS or attempt == self._max_retries:
+                    raise
+                await asyncio.sleep(self._retry_backoff * 2**attempt)
+        raise AssertionError("unreachable")
+
+    async def _request(self, query: dict[str, Any]) -> dict[str, Any]:
+        if self._limiter is not None:
+            await self._limiter.acquire()
         response = await self._http.get("", params=query)
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError:
+            response.raise_for_status()
+            raise
         # Last.fm reports errors in the body, sometimes with a 200 status.
         if "error" in data:
             raise LastFMError(data["error"], data.get("message", "Unknown Last.fm error"))
@@ -44,4 +79,10 @@ class LastFMClient:
         return data
 
     async def get_similar_artists(self, artist: str, limit: int | None = None) -> dict[str, Any]:
-        return await self.call("artist.getSimilar", artist=artist, limit=limit, autocorrect=1)
+        key = ("artist.getSimilar", artist.casefold(), limit)
+        if self._cache is not None and (cached := self._cache.get(key)) is not None:
+            return cached
+        data = await self.call("artist.getSimilar", artist=artist, limit=limit, autocorrect=1)
+        if self._cache is not None:
+            self._cache.set(key, data)
+        return data
