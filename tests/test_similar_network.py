@@ -67,7 +67,7 @@ def test_network_endpoint(client, lastfm_mock):
     }
     lastfm_mock.respond(side_effect=lambda req: responses[req.url.params["artist"]])
 
-    response = client.get("/artists/Artist A/similar/network", params={"limit": 2})
+    response = client.get("/artists/similar/network", params={"artist": "Artist A", "limit": 2})
 
     assert response.status_code == 200
     body = response.json()
@@ -82,4 +82,4 @@ def test_network_endpoint_main_artist_not_found(client, lastfm_mock):
     lastfm_mock.respond(
         return_value=httpx2.Response(200, json={"error": 6, "message": "not found"})
     )
-    assert client.get("/artists/nope/similar/network").status_code == 404
+    assert client.get("/artists/similar/network", params={"artist": "nope"}).status_code == 404

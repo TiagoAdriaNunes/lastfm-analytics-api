@@ -33,9 +33,17 @@ async def _call_lastfm[T](coro: Awaitable[T]) -> T:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Last.fm request failed") from exc
 
 
-@router.get("/{artist}/similar", response_model=SimilarArtistsResponse)
+# Query parameter, not a path segment: artist names can contain "/" (e.g. "AC/DC"), which would
+# split the URL path and never match a route, even when percent-encoded.
+ArtistQuery = Annotated[
+    str,
+    Query(min_length=1, max_length=200, pattern=r"\S", description="Artist name, e.g. AC/DC"),
+]
+
+
+@router.get("/similar", response_model=SimilarArtistsResponse)
 async def get_similar_artists(
-    artist: str,
+    artist: ArtistQuery,
     lastfm: LastFMDep,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> SimilarArtistsResponse:
@@ -43,9 +51,9 @@ async def get_similar_artists(
     return parse_similar_artists(data)
 
 
-@router.get("/{artist}/similar/network", response_model=SimilarArtistsNetwork)
+@router.get("/similar/network", response_model=SimilarArtistsNetwork)
 async def get_similar_artists_network(
-    artist: str,
+    artist: ArtistQuery,
     lastfm: LastFMDep,
     limit: Annotated[int, Query(ge=1, le=20, description="Similar artists per level")] = 5,
 ) -> SimilarArtistsNetwork:

@@ -14,8 +14,8 @@ def get_lastfm_client(request: Request) -> LastFMClient:
         settings.lastfm_api_secret,
         cache=request.app.state.lastfm_cache,
         limiter=request.app.state.lastfm_limiter,
-        max_retries=settings.lastfm_max_retries,
-        retry_backoff=settings.lastfm_retry_backoff,
+        max_retries=settings.lastfm.max_retries,
+        retry_backoff=settings.lastfm.retry_backoff,
     )
 
 

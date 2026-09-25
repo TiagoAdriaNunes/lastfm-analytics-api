@@ -16,12 +16,14 @@ FastAPI service for music analytics on top of the [Last.fm API](https://www.last
 | Method | Path | Description |
 | ------ | ---- | ----------- |
 | GET | `/health` | Health check |
-| GET | `/artists/{artist}/similar?limit=10` | Artists similar to `artist`, with a 0–1 match score |
-| GET | `/artists/{artist}/similar/network?limit=5` | Two-level similar-artist network (`nodes` + `edges`) for graph visualisation |
+| GET | `/artists/similar?artist=Radiohead&limit=10` | Artists similar to `artist`, with a 0–1 match score |
+| GET | `/artists/similar/network?artist=Radiohead&limit=5` | Two-level similar-artist network (`nodes` + `edges`) for graph visualisation |
 
 ```sh
-curl "http://127.0.0.1:8000/artists/Radiohead/similar?limit=3"
-curl "http://127.0.0.1:8000/artists/Radiohead/similar/network?limit=3"
+curl "http://127.0.0.1:8000/artists/similar?artist=Radiohead&limit=3"
+curl "http://127.0.0.1:8000/artists/similar/network?artist=Radiohead&limit=3"
+# Names with special characters must be URL-encoded (curl can do it for you):
+curl -G "http://127.0.0.1:8000/artists/similar" --data-urlencode "artist=AC/DC"
 ```
 
 Network response shape:
@@ -43,8 +45,14 @@ hits don't count. So an uncached network with `limit=5` (6 calls) takes about 3s
 If Last.fm rate-limits us (error 29) or is temporarily down (8, 11, 16), the call is retried twice with
 backoff (1s, 2s); if it still fails, the API returns `503` with `Retry-After: 60`.
 
-Tunable via env vars: `LASTFM_RATE_LIMIT`, `LASTFM_MAX_RETRIES`, `LASTFM_RETRY_BACKOFF`,
-`LASTFM_CACHE_TTL`, `USER_AGENT`.
+## Configuration
+
+- **`config.yaml`** (committed): all non-secret settings (rate limit, retries, cache TTL, timeout,
+  User-Agent), with comments.
+- **`.env` / environment variables**: secrets (`LASTFM_API_KEY`, `LASTFM_API_SECRET`), never in YAML.
+- **Overrides**: environment variables beat `config.yaml`. Join the section and key with `__`,
+  e.g. `LASTFM__RATE_LIMIT=1` or `HTTP__TIMEOUT=5`.
+- **Another file**: `APP_CONFIG_FILE=path/to/other.yaml`.
 
 ## Tests
 

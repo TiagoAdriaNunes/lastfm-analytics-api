@@ -1,0 +1,24 @@
+# Application configuration (non-secret, committed).
+#
+# Secrets (LASTFM_API_KEY, LASTFM_API_SECRET) go in `.env` or environment variables, never here.
+# Any value below can be overridden by an environment variable: section and key joined by a
+# double underscore, e.g. LASTFM__RATE_LIMIT=1 or HTTP__TIMEOUT=5.
+# Point to a different file with APP_CONFIG_FILE=path/to/config.yaml.
+
+lastfm:
+  base_url: https://ws.audioscrobbler.com/2.0/
+  # Requests per second to Last.fm, evenly spaced, shared by the whole app. Last.fm's ToS
+  # historically allowed 5 req/s averaged over 5 minutes; we keep a safety margin.
+  rate_limit: 2.0
+  # Retries for rate-limited (29) and temporary (8, 11, 16) Last.fm errors.
+  max_retries: 2
+  # Seconds before the first retry; doubles on each attempt (1s, 2s, ...).
+  retry_backoff: 1.0
+  # How long Last.fm responses are cached in memory, in seconds.
+  cache_ttl: 3600
+
+http:
+  # Per-request timeout to Last.fm, in seconds.
+  timeout: 10.0
+  # Last.fm asks for an identifiable User-Agent.
+  user_agent: lastfm-analytics-api/0.1.0 (+https://github.com/TiagoAdriaNunes/lastfm-analytics-api)
