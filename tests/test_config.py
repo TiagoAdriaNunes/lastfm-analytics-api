@@ -90,3 +90,11 @@ def test_service_api_key_is_required_and_long(monkeypatch, value):
 def test_service_api_key_is_stripped(monkeypatch):
     monkeypatch.setenv("SERVICE_API_KEY", " a-long-enough-service-key\n")
     assert load().service_api_key == "a-long-enough-service-key"
+
+
+@pytest.mark.parametrize("client_rate", ["1.5", "2"])
+def test_examples_client_rate_must_be_below_global(monkeypatch, client_rate):
+    # Committed rate_limit is 1.5; a per-client limit at or above it would never trigger.
+    monkeypatch.setenv("EXAMPLES__CLIENT_RATE_LIMIT", client_rate)
+    with pytest.raises(ValidationError, match="client_rate_limit must be below"):
+        load()

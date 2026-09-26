@@ -1,9 +1,9 @@
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import BaseModel, PositiveFloat, PositiveInt, StringConstraints
+from pydantic import BaseModel, PositiveFloat, PositiveInt, StringConstraints, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -31,6 +31,13 @@ class ExamplesSettings(BaseModel):
     client_rate_limit: PositiveFloat
     max_clients: PositiveInt
     cache_size: PositiveInt
+
+    @model_validator(mode="after")
+    def client_rate_below_global(self) -> Self:
+        # Otherwise the per-client limit never triggers and one caller can take the whole budget.
+        if self.client_rate_limit >= self.rate_limit:
+            raise ValueError("examples.client_rate_limit must be below examples.rate_limit")
+        return self
 
 
 class HTTPSettings(BaseModel):

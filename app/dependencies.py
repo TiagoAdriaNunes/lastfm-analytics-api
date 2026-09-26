@@ -36,12 +36,13 @@ PublicLastFMDep = Annotated[LastFMClient, Depends(get_public_lastfm_client)]
 
 
 def get_client_ip(request: Request) -> str:
-    """The caller's IP, for per-client limits. Behind Railway's proxy the socket peer is the proxy,
-    and the proxy appends the real peer to `X-Forwarded-For`, so the rightmost entry is the one a
-    client can't forge (uvicorn's `--forwarded-allow-ips=*` would take the forgeable leftmost). If
-    that entry is ever a proxy instead, all callers share one limit: safe, just less fair."""
+    """The caller's IP, for per-client limits. Behind Railway's proxy the socket peer is the proxy.
+    Railway strips client-sent `X-Forwarded-For` at its edge and puts the real client first; more
+    internal hops (e.g. its CDN) may be appended after it, so the rightmost entry is not the client.
+    Without such a proxy (local dev) the header is forgeable, which only bypasses the per-client
+    limit: the global public limit still applies."""
     if forwarded := request.headers.get("x-forwarded-for"):
-        return forwarded.rsplit(",", 1)[-1].strip()
+        return forwarded.split(",", 1)[0].strip()
     return request.client.host if request.client else "unknown"
 
 
