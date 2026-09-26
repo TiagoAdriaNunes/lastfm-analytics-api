@@ -67,3 +67,13 @@ def test_invalid_value_is_rejected(monkeypatch):
     monkeypatch.setenv("LASTFM__RATE_LIMIT", "0")
     with pytest.raises(ValidationError, match="rate_limit"):
         load()
+
+
+@pytest.mark.parametrize("value", [None, "too-short"])
+def test_service_api_key_is_required_and_long(monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv("SERVICE_API_KEY")
+    else:
+        monkeypatch.setenv("SERVICE_API_KEY", value)
+    with pytest.raises(ValidationError, match="service_api_key"):
+        load()

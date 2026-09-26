@@ -2,7 +2,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import BaseModel, PositiveFloat
+from pydantic import BaseModel, Field, PositiveFloat
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     # Secrets: environment / .env only.
     lastfm_api_key: str
     lastfm_api_secret: str = ""
+    # Clients must send this in the `X-API-Key` header. Required, so the app never starts open.
+    service_api_key: str = Field(min_length=16)
 
     lastfm: LastFMSettings
     http: HTTPSettings
