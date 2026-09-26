@@ -27,6 +27,10 @@ DOUBLE_DECODED_METHODS = {
 DOUBLE_DECODED_PARAMS = {"artist", "track"}
 
 
+class QuotaExceededError(Exception):
+    """The caller's own budget of Last.fm calls is used up (see `search_artists`)."""
+
+
 class LastFMError(Exception):
     def __init__(self, code: int, message: str) -> None:
         super().__init__(message)
@@ -99,6 +103,24 @@ class LastFMClient:
         if self._cache is not None and (cached := self._cache.get(key)) is not None:
             return cached
         data = await self.call("artist.getSimilar", artist=artist, limit=limit, autocorrect=1)
+        if self._cache is not None:
+            self._cache.set(key, data)
+        return data
+
+    async def search_artists(
+        self, artist: str, limit: int | None = None, quota: AsyncLimiter | None = None
+    ) -> dict[str, Any]:
+        """`artist.search`. `quota` is an extra limiter for unauthenticated callers: on a cache
+        miss it must have room right now or `QuotaExceededError` is raised (no queueing), so
+        public traffic can only use that slice of the shared Last.fm budget."""
+        key = ("artist.search", artist.casefold(), limit)
+        if self._cache is not None and (cached := self._cache.get(key)) is not None:
+            return cached
+        if quota is not None:
+            if not quota.has_capacity():
+                raise QuotaExceededError
+            await quota.acquire()  # has capacity, so this returns without waiting
+        data = await self.call("artist.search", artist=artist, limit=limit)
         if self._cache is not None:
             self._cache.set(key, data)
         return data

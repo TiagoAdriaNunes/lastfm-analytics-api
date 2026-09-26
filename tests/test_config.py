@@ -9,6 +9,7 @@ def clean_env(monkeypatch):
     # conftest sets these globally for speed; config tests need to see the YAML values.
     monkeypatch.delenv("LASTFM__RATE_LIMIT", raising=False)
     monkeypatch.delenv("LASTFM__RETRY_BACKOFF", raising=False)
+    monkeypatch.delenv("LASTFM__PUBLIC_RATE_LIMIT", raising=False)
     monkeypatch.delenv("APP_CONFIG_FILE", raising=False)
 
 
@@ -44,6 +45,7 @@ def test_app_config_file_selects_another_yaml(monkeypatch, tmp_path):
         "lastfm:\n"
         "  base_url: http://localhost:9999/\n"
         "  rate_limit: 0.5\n"
+        "  public_rate_limit: 0.1\n"
         "  max_retries: 0\n"
         "  retry_backoff: 0\n"
         "  cache_ttl: 1\n"

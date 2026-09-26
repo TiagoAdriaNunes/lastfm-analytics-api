@@ -21,6 +21,7 @@ def config_file() -> Path:
 class LastFMSettings(BaseModel):
     base_url: str
     rate_limit: PositiveFloat
+    public_rate_limit: PositiveFloat
     max_retries: int
     retry_backoff: float
     cache_ttl: float

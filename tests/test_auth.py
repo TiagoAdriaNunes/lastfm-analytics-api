@@ -34,7 +34,7 @@ def test_openapi_marks_protected_routes(client):
     assert "security" not in paths["/health"]["get"]
 
 
-PUBLIC_PATHS = {"/health"}
+PUBLIC_PATHS = {"/health", "/examples/artists/search"}
 
 
 def test_every_non_public_route_requires_api_key(client):
@@ -48,3 +48,10 @@ def test_every_non_public_route_requires_api_key(client):
         if operation.get("security") != [{"APIKeyHeader": []}]
     ]
     assert unprotected == []
+
+
+def test_openapi_links_to_source_repo(client):
+    schema = client.get("/openapi.json").json()
+    repo = "https://github.com/TiagoAdriaNunes/lastfm-analytics-api"
+    assert schema["externalDocs"]["url"] == repo
+    assert schema["info"]["license"] == {"name": "MIT", "url": f"{repo}/blob/main/LICENSE"}

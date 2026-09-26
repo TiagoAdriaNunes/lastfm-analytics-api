@@ -19,11 +19,14 @@ Run `make` to list all shortcuts: `dev`, `run`, `test`, `lint`, `format`, `check
 
 | Method | Path | Description |
 | ------ | ---- | ----------- |
-| GET | `/health` | Health check |
+| GET | `/health` | Health check (public) |
+| GET | `/examples/artists/search?artist=Radiohead&limit=5` | Search artists by name, with listener counts (public, `limit` 1–10) |
+| GET | `/artists/search?artist=Radiohead&limit=10` | Search artists by name, with listener counts (`limit` 1–100) |
 | GET | `/artists/similar?artist=Radiohead&limit=10` | Artists similar to `artist`, with a 0–1 match score |
 | GET | `/artists/similar/network?artist=Radiohead&limit=5` | Two-level similar-artist network (`nodes` + `edges`) for graph visualisation |
 
 ```sh
+curl "http://127.0.0.1:8000/examples/artists/search?artist=Radiohead"   # no key needed
 curl "http://127.0.0.1:8000/artists/similar?artist=Radiohead&limit=3"
 curl "http://127.0.0.1:8000/artists/similar/network?artist=Radiohead&limit=3"
 # Names with special characters must be URL-encoded (curl can do it for you):
@@ -49,9 +52,14 @@ hits don't count. So an uncached network with `limit=5` (6 calls) takes about 3s
 If Last.fm rate-limits us (error 29) or is temporarily down (8, 11, 16), the call is retried twice with
 backoff (1s, 2s); if it still fails, the API returns `503` with `Retry-After: 60`.
 
+The public `/examples` endpoints have an extra budget on top of that: **one uncached Last.fm call every
+2s** (`lastfm.public_rate_limit`). Beyond it they return `429` with `Retry-After` right away instead of
+queueing, so anonymous traffic can never take more than a quarter of the shared budget. Cached
+searches are always served.
+
 ## Authentication
 
-Every endpoint except `/health` requires the `X-API-Key` header to match `SERVICE_API_KEY` (at least 16
+Every endpoint except `/health` and `/examples/*` requires the `X-API-Key` header to match `SERVICE_API_KEY` (at least 16
 characters; the app refuses to start without it). Otherwise it returns `401`.
 
 ```sh
