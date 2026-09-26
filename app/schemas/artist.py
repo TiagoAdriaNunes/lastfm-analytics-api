@@ -66,7 +66,7 @@ def parse_artist_search(data: dict[str, Any]) -> ArtistSearchResponse:
 class NetworkNode(BaseModel):
     id: int
     name: str
-    level: int  # 0 = searched artist, 1 = similar, 2 = similar of similar
+    level: int  # 0 = searched artist, 1 = similar, 2 = similar of similar, 3 = one more hop
     url: str | None = None
 
 

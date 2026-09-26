@@ -16,6 +16,9 @@ lastfm:
   retry_backoff: 1.0
   # How long Last.fm responses are cached in memory, in seconds.
   cache_ttl: 3600
+  # Max worst-case Last.fm calls for one /artists/similar/network request (1 + limit + limit² for
+  # depth 3). Bigger requests get 422. 60 calls = ~30s uncached at 2 req/s; allows depth 3 up to limit 7.
+  network_max_calls: 60
 
 # Public (no API key) example endpoints. Their uncached Last.fm calls also pass the shared limiter
 # above; these caps come on top. Requests over a cap get 429 + Retry-After right away (no waiting).
