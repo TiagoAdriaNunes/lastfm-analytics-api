@@ -20,9 +20,10 @@ lastfm:
 # Public (no API key) example endpoints. Their uncached Last.fm calls also pass the shared limiter
 # above; these caps come on top. Requests over a cap get 429 + Retry-After right away (no waiting).
 examples:
-  # Calls per second for all anonymous callers together. 0.5 = one call every 2s.
-  rate_limit: 0.5
-  # Calls per second per client IP. 1.0 = one uncached search per second per caller.
+  # Calls per second for all anonymous callers together (out of lastfm.rate_limit).
+  rate_limit: 1.5
+  # Calls per second per client IP. Must be below rate_limit, or one caller could use the whole
+  # public budget and lock everyone else out (checked at startup).
   client_rate_limit: 1.0
   # How many client IPs are tracked at once (oldest dropped first).
   max_clients: 4096

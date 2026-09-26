@@ -1,6 +1,7 @@
+import asyncio
+
 import httpx2
 import pytest
-from aiolimiter import AsyncLimiter
 
 from app.main import app
 from app.schemas.artist import parse_artist_search
@@ -130,23 +131,32 @@ def test_global_quota_caps_all_clients_together(client, lastfm_mock):
     assert response.headers["Retry-After"] == "60"
 
 
-def test_client_ip_uses_rightmost_forwarded_for(client, lastfm_mock):
-    # The leftmost entries come from the client and can be forged; the proxy appends the real one.
+def test_client_ip_uses_leftmost_forwarded_for(client, lastfm_mock):
+    # Railway puts the real client first and may append its own internal hops after it.
     app.state.public_quota = PublicQuota(rate=1000, client_rate=1 / 60, max_clients=10)
     lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
 
-    assert search(client, "radiohead", ip="9.9.9.9, 1.1.1.1").status_code == 200
-    assert search(client, "muse", ip="8.8.8.8, 1.1.1.1").status_code == 429
+    assert search(client, "radiohead", ip="1.1.1.1, 100.64.0.1").status_code == 200
+    assert search(client, "muse", ip="1.1.1.1, 100.64.0.2").status_code == 429
+    assert search(client, "muse", ip="2.2.2.2, 100.64.0.1").status_code == 200
 
 
-async def test_refused_quota_does_not_use_up_the_other_limit():
-    quota = PublicQuota(rate=1 / 60, client_rate=1000, max_clients=10)
+async def test_global_refusal_does_not_use_up_the_client_slot():
+    quota = PublicQuota(rate=20, client_rate=1 / 60, max_clients=10)  # global: every 0.05s
     await quota.take("a")
-    # Global is full: "b" is refused, and its own per-client slot must stay unused.
     with pytest.raises(QuotaExceededError):
-        await quota.take("b")
-    quota._limiter = AsyncLimiter(1, 60)  # free the global budget again
-    await quota.take("b")
+        await quota.take("b")  # global is full
+    await asyncio.sleep(0.06)
+    await quota.take("b")  # b's own slot (one per minute) must still be free
+
+
+async def test_client_refusal_does_not_use_up_the_global_slot():
+    quota = PublicQuota(rate=5, client_rate=1 / 60, max_clients=10)  # global: every 0.2s
+    await quota.take("a")
+    await asyncio.sleep(0.25)
+    with pytest.raises(QuotaExceededError):
+        await quota.take("a")  # a's own slot is used up
+    await quota.take("b")  # the global slot must still be free
 
 
 def test_public_results_use_their_own_cache(client, lastfm_mock):
@@ -157,3 +167,14 @@ def test_public_results_use_their_own_cache(client, lastfm_mock):
 
     # Same query and limit, but the caches are separate: two Last.fm calls.
     assert lastfm_mock.call_count == 2
+
+
+def test_refusal_is_logged_with_client_ip(client, lastfm_mock, caplog):
+    app.state.public_quota = PublicQuota(rate=1000, client_rate=1 / 60, max_clients=10)
+    lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
+
+    search(client, "radiohead", ip="1.1.1.1")
+    with caplog.at_level("INFO", logger="uvicorn.error"):
+        search(client, "muse", ip="1.1.1.1")
+
+    assert "Public quota refused 1.1.1.1" in caplog.text

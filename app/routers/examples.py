@@ -2,6 +2,7 @@
 (`PublicQuota`: global + per client) on top of the shared Last.fm limiter, so anonymous traffic
 can't starve the authenticated endpoints or push their entries out of the main cache."""
 
+import logging
 import math
 from functools import partial
 from typing import Annotated
@@ -14,6 +15,8 @@ from app.schemas.artist import ArtistSearchResponse, parse_artist_search
 from app.services.quota import QuotaExceededError
 
 router = APIRouter(prefix="/examples", tags=["examples (public)"])
+# uvicorn's logger, so this shows up in the server (Railway) logs without extra logging setup.
+logger = logging.getLogger("uvicorn.error")
 
 
 @router.get(
@@ -33,6 +36,8 @@ async def search_artists(
     try:
         data = await _call_lastfm(lastfm.search_artists(artist, limit=limit, quota=quota))
     except QuotaExceededError as exc:
+        # Includes the client IP, which is how to check `get_client_ip` picks the right one.
+        logger.info("Public quota refused %s: %s", client_ip, exc)
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             "Public example quota exceeded, try again shortly",

@@ -53,8 +53,9 @@ If Last.fm rate-limits us (error 29) or is temporarily down (8, 11, 16), the cal
 backoff (1s, 2s); if it still fails, the API returns `503` with `Retry-After: 60`.
 
 The public `/examples` endpoints have extra limits on top of that (`examples` in `config.yaml`):
-**one uncached Last.fm call every 2s** for all anonymous callers together, and **one per second per
-client IP**. Beyond either they return `429` with `Retry-After` right away instead of queueing. They
+**1.5 uncached Last.fm calls per second** for all anonymous callers together, and **one per second per
+client IP** (so one caller can't take it all; the app refuses to start if the per-client limit isn't
+below the global one). Beyond either they return `429` with `Retry-After` right away instead of queueing. They
 also have their own small cache, so anonymous traffic can't push out the entries the authenticated
 endpoints rely on. Cached searches are always served.
 
