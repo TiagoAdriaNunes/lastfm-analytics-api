@@ -2,6 +2,7 @@ import os
 
 os.environ.setdefault("LASTFM_API_KEY", "test-key")
 os.environ.setdefault("LASTFM_API_SECRET", "test-secret")
+os.environ["SERVICE_API_KEY"] = TEST_SERVICE_API_KEY = "test-service-api-key"
 # Keep tests fast: effectively no pacing and no retry sleeps.
 os.environ["LASTFM__RATE_LIMIT"] = "1000"
 os.environ["LASTFM__RETRY_BACKOFF"] = "0"
@@ -68,7 +69,7 @@ def lastfm_mock() -> LastFMMock:
 
 @pytest.fixture
 def client(lastfm_mock: LastFMMock):
-    with TestClient(app) as c:
+    with TestClient(app, headers={"X-API-Key": TEST_SERVICE_API_KEY}) as c:
         # Route the app's Last.fm traffic through the mock, keeping the real client's config
         # (base URL, headers such as User-Agent).
         real = app.state.http_client

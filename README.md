@@ -7,9 +7,13 @@ FastAPI service for music analytics on top of the [Last.fm API](https://www.last
 ## Setup
 
 1. Get an API key at https://www.last.fm/api/account/create
-2. `cp .env.example .env` and fill in `LASTFM_API_KEY` / `LASTFM_API_SECRET`
-3. `uv sync`
-4. `uv run fastapi dev app/main.py` and open http://127.0.0.1:8000/docs
+2. `cp .env.example .env` and fill in `LASTFM_API_KEY` / `LASTFM_API_SECRET`, plus a
+   `SERVICE_API_KEY` (generate one with `make key`)
+3. `make install` (or `uv sync`)
+4. `make dev` (or `uv run fastapi dev app/main.py`) and open http://127.0.0.1:8000/docs
+
+Run `make` to list all shortcuts: `dev`, `run`, `test`, `lint`, `format`, `check` (same as CI),
+`lock`, `key`. Each is a thin wrapper around a `uv` command, so `make` is optional.
 
 ## Endpoints
 
@@ -45,11 +49,24 @@ hits don't count. So an uncached network with `limit=5` (6 calls) takes about 3s
 If Last.fm rate-limits us (error 29) or is temporarily down (8, 11, 16), the call is retried twice with
 backoff (1s, 2s); if it still fails, the API returns `503` with `Retry-After: 60`.
 
+## Authentication
+
+Every endpoint except `/health` requires the `X-API-Key` header to match `SERVICE_API_KEY` (at least 16
+characters; the app refuses to start without it). Otherwise it returns `401`.
+
+```sh
+python -c "import secrets; print(secrets.token_urlsafe(32))"   # generate a key
+curl -H "X-API-Key: $SERVICE_API_KEY" "http://127.0.0.1:8000/artists/similar?artist=Radiohead"
+```
+
+In `/docs`, click **Authorize** and paste the key to try the endpoints.
+
 ## Configuration
 
 - **`config.yaml`** (committed): all non-secret settings (rate limit, retries, cache TTL, timeout,
   User-Agent), with comments.
-- **`.env` / environment variables**: secrets (`LASTFM_API_KEY`, `LASTFM_API_SECRET`), never in YAML.
+- **`.env` / environment variables**: secrets (`LASTFM_API_KEY`, `LASTFM_API_SECRET`, `SERVICE_API_KEY`),
+  never in YAML.
 - **Overrides**: environment variables beat `config.yaml`. Join the section and key with `__`,
   e.g. `LASTFM__RATE_LIMIT=1` or `HTTP__TIMEOUT=5`.
 - **Another file**: `APP_CONFIG_FILE=path/to/other.yaml`.
@@ -57,5 +74,6 @@ backoff (1s, 2s); if it still fails, the API returns `503` with `Retry-After: 60
 ## Tests
 
 ```sh
-uv run pytest
+make test     # or: uv run pytest
+make check    # everything CI runs: locked sync, ruff lint + format check, tests
 ```
