@@ -1,8 +1,10 @@
 import httpx2
+import pytest
 from aiolimiter import AsyncLimiter
 
 from app.main import app
 from app.schemas.artist import parse_artist_search
+from app.services.quota import PublicQuota, QuotaExceededError
 
 SEARCH_RESPONSE = {
     "results": {
@@ -87,17 +89,71 @@ def test_search_maps_lastfm_errors(client, lastfm_mock):
     assert response.status_code == 503
 
 
-def test_public_quota_returns_429_and_cache_hits_bypass_it(client, lastfm_mock):
-    # Room for exactly one uncached call per minute.
-    app.state.public_limiter = AsyncLimiter(1, 60)
+def search(client, artist: str, ip: str | None = None) -> httpx2.Response:
+    headers = {"X-Forwarded-For": ip} if ip else {}
+    return client.get("/examples/artists/search", params={"artist": artist}, headers=headers)
+
+
+def test_client_quota_returns_429_and_cache_hits_bypass_it(client, lastfm_mock):
+    # Global budget is plentiful; each client gets one uncached call per minute.
+    app.state.public_quota = PublicQuota(rate=1000, client_rate=1 / 60, max_clients=10)
     lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
 
-    assert client.get("/examples/artists/search", params={"artist": "radiohead"}).status_code == 200
+    assert search(client, "radiohead").status_code == 200
     # Same query: served from cache, doesn't need quota.
-    assert client.get("/examples/artists/search", params={"artist": "Radiohead"}).status_code == 200
-    # New query: needs Last.fm, but the quota is used up.
-    response = client.get("/examples/artists/search", params={"artist": "muse"})
+    assert search(client, "Radiohead").status_code == 200
+    # New query: needs Last.fm, but this client's quota is used up.
+    response = search(client, "muse")
 
     assert response.status_code == 429
-    assert response.headers["Retry-After"] == "1"  # ceil(1 / LASTFM__PUBLIC_RATE_LIMIT=1000)
+    assert response.headers["Retry-After"] == "60"
     assert lastfm_mock.call_count == 1
+
+
+def test_one_client_cannot_lock_out_others(client, lastfm_mock):
+    app.state.public_quota = PublicQuota(rate=1000, client_rate=1 / 60, max_clients=10)
+    lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
+
+    assert search(client, "radiohead", ip="1.1.1.1").status_code == 200
+    assert search(client, "muse", ip="1.1.1.1").status_code == 429
+    assert search(client, "muse", ip="2.2.2.2").status_code == 200
+
+
+def test_global_quota_caps_all_clients_together(client, lastfm_mock):
+    app.state.public_quota = PublicQuota(rate=1 / 60, client_rate=1000, max_clients=10)
+    lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
+
+    assert search(client, "radiohead", ip="1.1.1.1").status_code == 200
+    response = search(client, "muse", ip="2.2.2.2")
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == "60"
+
+
+def test_client_ip_uses_rightmost_forwarded_for(client, lastfm_mock):
+    # The leftmost entries come from the client and can be forged; the proxy appends the real one.
+    app.state.public_quota = PublicQuota(rate=1000, client_rate=1 / 60, max_clients=10)
+    lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
+
+    assert search(client, "radiohead", ip="9.9.9.9, 1.1.1.1").status_code == 200
+    assert search(client, "muse", ip="8.8.8.8, 1.1.1.1").status_code == 429
+
+
+async def test_refused_quota_does_not_use_up_the_other_limit():
+    quota = PublicQuota(rate=1 / 60, client_rate=1000, max_clients=10)
+    await quota.take("a")
+    # Global is full: "b" is refused, and its own per-client slot must stay unused.
+    with pytest.raises(QuotaExceededError):
+        await quota.take("b")
+    quota._limiter = AsyncLimiter(1, 60)  # free the global budget again
+    await quota.take("b")
+
+
+def test_public_results_use_their_own_cache(client, lastfm_mock):
+    lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
+
+    search(client, "radiohead")
+    client.get("/artists/search", params={"artist": "radiohead", "limit": 5})
+
+    # Same query and limit, but the caches are separate: two Last.fm calls.
+    assert lastfm_mock.call_count == 2

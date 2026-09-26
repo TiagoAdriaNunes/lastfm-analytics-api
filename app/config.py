@@ -3,7 +3,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import BaseModel, PositiveFloat, StringConstraints
+from pydantic import BaseModel, PositiveFloat, PositiveInt, StringConstraints
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -21,10 +21,16 @@ def config_file() -> Path:
 class LastFMSettings(BaseModel):
     base_url: str
     rate_limit: PositiveFloat
-    public_rate_limit: PositiveFloat
     max_retries: int
     retry_backoff: float
     cache_ttl: float
+
+
+class ExamplesSettings(BaseModel):
+    rate_limit: PositiveFloat
+    client_rate_limit: PositiveFloat
+    max_clients: PositiveInt
+    cache_size: PositiveInt
 
 
 class HTTPSettings(BaseModel):
@@ -50,6 +56,7 @@ class Settings(BaseSettings):
     service_api_key: Annotated[str, StringConstraints(strip_whitespace=True, min_length=16)]
 
     lastfm: LastFMSettings
+    examples: ExamplesSettings
     http: HTTPSettings
 
     @classmethod
