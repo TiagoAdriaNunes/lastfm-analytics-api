@@ -23,12 +23,13 @@ Run `make` to list all shortcuts: `dev`, `run`, `test`, `lint`, `format`, `check
 | GET | `/examples/artists/search?artist=Radiohead&limit=5` | Search artists by name, with listener counts (public, `limit` 1–10) |
 | GET | `/artists/search?artist=Radiohead&limit=10` | Search artists by name, with listener counts (`limit` 1–100) |
 | GET | `/artists/similar?artist=Radiohead&limit=10` | Artists similar to `artist`, with a 0–1 match score |
-| GET | `/artists/similar/network?artist=Radiohead&limit=5` | Two-level similar-artist network (`nodes` + `edges`) for graph visualisation |
+| GET | `/artists/similar/network?artist=Radiohead&limit=5&depth=2` | Similar-artist network (`nodes` + `edges`) for graph visualisation, `depth` 1–3 levels (default 2) |
 
 ```sh
 curl "http://127.0.0.1:8000/examples/artists/search?artist=Radiohead"   # no key needed
 curl "http://127.0.0.1:8000/artists/similar?artist=Radiohead&limit=3"
 curl "http://127.0.0.1:8000/artists/similar/network?artist=Radiohead&limit=3"
+curl "http://127.0.0.1:8000/artists/similar/network?artist=Radiohead&limit=5&depth=3"   # ~77 nodes
 # Names with special characters must be URL-encoded (curl can do it for you):
 curl -G "http://127.0.0.1:8000/artists/similar" --data-urlencode "artist=AC/DC"
 ```

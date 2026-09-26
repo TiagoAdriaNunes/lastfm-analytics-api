@@ -49,6 +49,7 @@ def test_app_config_file_selects_another_yaml(monkeypatch, tmp_path):
         "  max_retries: 0\n"
         "  retry_backoff: 0\n"
         "  cache_ttl: 1\n"
+        "  network_max_calls: 10\n"
         "examples:\n"
         "  rate_limit: 0.1\n"
         "  client_rate_limit: 0.01\n"

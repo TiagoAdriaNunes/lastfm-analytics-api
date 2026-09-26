@@ -4,6 +4,7 @@ from typing import Annotated
 import httpx2
 from fastapi import APIRouter, HTTPException, Query, status
 
+from app.config import get_settings
 from app.dependencies import LastFMDep
 from app.schemas.artist import (
     ArtistSearchResponse,
@@ -13,7 +14,7 @@ from app.schemas.artist import (
     parse_similar_artists,
 )
 from app.services.lastfm import NOT_FOUND_ERROR, RETRYABLE_ERRORS, LastFMError
-from app.services.similar_network import fetch_similar_network
+from app.services.similar_network import fetch_similar_network, max_network_calls
 
 router = APIRouter(prefix="/artists", tags=["artists"])
 
@@ -69,6 +70,16 @@ async def get_similar_artists_network(
     artist: ArtistQuery,
     lastfm: LastFMDep,
     limit: Annotated[int, Query(ge=1, le=20, description="Similar artists per level")] = 5,
+    depth: Annotated[int, Query(ge=1, le=3, description="Levels around the searched artist")] = 2,
 ) -> SimilarArtistsNetwork:
-    """Two-level similar-artist graph (nodes + edges), ready for a network visualisation."""
-    return await _call_lastfm(fetch_similar_network(lastfm, artist, limit))
+    """Similar-artist graph (nodes + edges), `depth` levels deep, ready for a network
+    visualisation. Deeper graphs need more Last.fm calls: up to 1 + limit + limit² for depth 3,
+    capped by `lastfm.network_max_calls` (e.g. depth 3 works up to limit 7)."""
+    max_calls = get_settings().lastfm.network_max_calls
+    if (calls := max_network_calls(limit, depth)) > max_calls:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"limit={limit} with depth={depth} can need {calls} Last.fm calls (max {max_calls}); "
+            "lower limit or depth",
+        )
+    return await _call_lastfm(fetch_similar_network(lastfm, artist, limit, depth))
