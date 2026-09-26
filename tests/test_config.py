@@ -69,7 +69,7 @@ def test_invalid_value_is_rejected(monkeypatch):
         load()
 
 
-@pytest.mark.parametrize("value", [None, "too-short"])
+@pytest.mark.parametrize("value", [None, "", "too-short", "  too-short  \n"])
 def test_service_api_key_is_required_and_long(monkeypatch, value):
     if value is None:
         monkeypatch.delenv("SERVICE_API_KEY")
@@ -77,3 +77,8 @@ def test_service_api_key_is_required_and_long(monkeypatch, value):
         monkeypatch.setenv("SERVICE_API_KEY", value)
     with pytest.raises(ValidationError, match="service_api_key"):
         load()
+
+
+def test_service_api_key_is_stripped(monkeypatch):
+    monkeypatch.setenv("SERVICE_API_KEY", " a-long-enough-service-key\n")
+    assert load().service_api_key == "a-long-enough-service-key"

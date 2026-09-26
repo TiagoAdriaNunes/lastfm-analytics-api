@@ -32,3 +32,19 @@ def test_openapi_marks_protected_routes(client):
     assert similar["security"] == [{"APIKeyHeader": []}]
     assert "401" in similar["responses"]
     assert "security" not in paths["/health"]["get"]
+
+
+PUBLIC_PATHS = {"/health"}
+
+
+def test_every_non_public_route_requires_api_key(client):
+    # Catches a new router included without `dependencies=[Depends(require_api_key)]`.
+    paths = client.get("/openapi.json").json()["paths"]
+    unprotected = [
+        f"{method.upper()} {path}"
+        for path, operations in paths.items()
+        if path not in PUBLIC_PATHS
+        for method, operation in operations.items()
+        if operation.get("security") != [{"APIKeyHeader": []}]
+    ]
+    assert unprotected == []
