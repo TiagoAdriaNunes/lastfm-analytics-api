@@ -66,11 +66,27 @@ async def test_cancelled_caller_does_not_cancel_the_shared_call(http, lastfm_moc
 
     first = asyncio.create_task(make_client(http, inflight, cache).get_similar_artists("Cher"))
     second = asyncio.create_task(make_client(http, inflight, cache).get_similar_artists("Cher"))
-    await asyncio.sleep(0.02)  # both are now waiting on the same fetch
+    await asyncio.sleep(0)  # one loop turn: both start and join the same fetch
     first.cancel()
 
     assert await second == MOCK_RESPONSE
     assert first.cancelled()
+    assert lastfm_mock.call_count == 1
+
+
+async def test_result_is_cached_even_if_every_caller_is_cancelled(http, lastfm_mock):
+    lastfm_mock.respond(side_effect=slow(MOCK_RESPONSE))
+    inflight: InFlight = {}
+    cache = TTLCache(ttl=60)
+
+    caller = asyncio.create_task(make_client(http, inflight, cache).get_similar_artists("Cher"))
+    await asyncio.sleep(0)  # the fetch has started
+    (shared_fetch,) = inflight.values()
+    caller.cancel()
+    await shared_fetch  # the call still completes...
+
+    # ...and serves the next request from the cache.
+    assert await make_client(http, inflight, cache).get_similar_artists("Cher") == MOCK_RESPONSE
     assert lastfm_mock.call_count == 1
 
 
