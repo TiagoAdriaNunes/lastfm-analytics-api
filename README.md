@@ -49,6 +49,8 @@ Network response shape:
 All calls to Last.fm share one limiter: **2 requests/second, evenly spaced** (one call every 0.5s),
 well under Last.fm's historical 5 req/s guideline. Responses are cached in memory for an hour, and cache
 hits don't count. So an uncached network with `limit=5` (6 calls) takes about 3s, and a repeat is instant.
+Identical requests that arrive while the first is still waiting on Last.fm share its call instead of
+making their own, so e.g. two users opening the same artist at once cost one set of calls.
 
 If Last.fm rate-limits us (error 29) or is temporarily down (8, 11, 16), the call is retried twice with
 backoff (1s, 2s); if it still fails, the API returns `503` with `Retry-After: 60`.

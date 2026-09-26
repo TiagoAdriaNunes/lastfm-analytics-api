@@ -19,6 +19,7 @@ def _lastfm_client(request: Request, cache: TTLCache) -> LastFMClient:
         limiter=request.app.state.lastfm_limiter,
         max_retries=settings.lastfm.max_retries,
         retry_backoff=settings.lastfm.retry_backoff,
+        inflight=request.app.state.lastfm_inflight,
     )
 
 

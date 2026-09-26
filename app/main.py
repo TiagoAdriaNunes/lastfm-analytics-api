@@ -24,6 +24,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.lastfm_cache = TTLCache(ttl=settings.lastfm.cache_ttl)
         # One call every 1/rate seconds, shared by every request (max_rate=1 disables bursts).
         app.state.lastfm_limiter = AsyncLimiter(1, 1 / settings.lastfm.rate_limit)
+        # Last.fm fetches in progress, so identical concurrent requests share one call.
+        app.state.lastfm_inflight = {}
         # Public example endpoints: their own cache and call budget (on top of the shared limiter).
         app.state.public_cache = TTLCache(
             ttl=settings.lastfm.cache_ttl, maxsize=settings.examples.cache_size

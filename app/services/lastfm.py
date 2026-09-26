@@ -1,6 +1,6 @@
 import asyncio
 import hashlib
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Hashable
 from typing import Any
 
 import httpx2
@@ -12,6 +12,10 @@ from app.services.cache import TTLCache
 NOT_FOUND_ERROR = 6
 RATE_LIMIT_ERROR = 29
 RETRYABLE_ERRORS = {8, 11, 16, RATE_LIMIT_ERROR}
+
+Response = dict[str, Any]
+# Cache key -> the Last.fm fetch currently running for it (see `LastFMClient._cached`).
+InFlight = dict[Hashable, asyncio.Task[Response]]
 SIGNED_METHODS = {"auth.getSession", "track.scrobble"}
 
 # Last.fm decodes the `artist`/`track` params of these methods twice, so a correctly encoded "+"
@@ -53,6 +57,7 @@ class LastFMClient:
         limiter: AsyncLimiter | None = None,
         max_retries: int = 0,
         retry_backoff: float = 1.0,
+        inflight: InFlight | None = None,
     ) -> None:
         self._http = http
         self._api_key = api_key
@@ -61,6 +66,7 @@ class LastFMClient:
         self._limiter = limiter
         self._max_retries = max_retries
         self._retry_backoff = retry_backoff
+        self._inflight = inflight
 
     async def call(self, method: str, **params: Any) -> dict[str, Any]:
         query = {k: v for k, v in params.items() if v is not None}
@@ -95,29 +101,65 @@ class LastFMClient:
         response.raise_for_status()
         return data
 
-    async def get_similar_artists(self, artist: str, limit: int | None = None) -> dict[str, Any]:
-        key = ("artist.getSimilar", artist.casefold(), limit)
+    async def _cached(self, key: Hashable, fetch: Callable[[], Awaitable[Response]]) -> Response:
+        """Return the cached response for `key`, or fetch and cache it. With an `inflight` map
+        (shared app-wide), concurrent misses for the same key share one fetch ("single-flight")
+        instead of each calling Last.fm. Errors reach every waiter and are never cached."""
         if self._cache is not None and (cached := self._cache.get(key)) is not None:
             return cached
-        data = await self.call("artist.getSimilar", artist=artist, limit=limit, autocorrect=1)
+        if self._inflight is None:
+            data = await fetch()
+        else:
+            data = await asyncio.shield(self._join_or_start(key, fetch))
         if self._cache is not None:
             self._cache.set(key, data)
         return data
+
+    def _join_or_start(
+        self, key: Hashable, fetch: Callable[[], Awaitable[Response]]
+    ) -> asyncio.Task[Response]:
+        assert self._inflight is not None
+        inflight = self._inflight
+        task = inflight.get(key)
+        # A finished task can linger until its done-callback runs; don't hand out its (possibly
+        # failed) result, start a fresh fetch instead.
+        if task is not None and not task.done():
+            return task
+
+        async def run() -> Response:
+            return await fetch()
+
+        task = asyncio.ensure_future(run())
+        inflight[key] = task
+
+        def done(finished: asyncio.Task[Response]) -> None:
+            if inflight.get(key) is finished:  # don't remove a newer fetch for the same key
+                del inflight[key]
+            if not finished.cancelled():
+                finished.exception()  # mark as retrieved even if every waiter was cancelled
+
+        task.add_done_callback(done)
+        return task
+
+    async def get_similar_artists(self, artist: str, limit: int | None = None) -> Response:
+        return await self._cached(
+            ("artist.getSimilar", artist.casefold(), limit),
+            lambda: self.call("artist.getSimilar", artist=artist, limit=limit, autocorrect=1),
+        )
 
     async def search_artists(
         self,
         artist: str,
         limit: int | None = None,
         quota: Callable[[], Awaitable[None]] | None = None,
-    ) -> dict[str, Any]:
-        """`artist.search`. `quota` runs only on a cache miss, before calling Last.fm; public
-        routes pass `PublicQuota.take`, which raises `QuotaExceededError` to refuse the call."""
-        key = ("artist.search", artist.casefold(), limit)
-        if self._cache is not None and (cached := self._cache.get(key)) is not None:
-            return cached
-        if quota is not None:
-            await quota()
-        data = await self.call("artist.search", artist=artist, limit=limit)
-        if self._cache is not None:
-            self._cache.set(key, data)
-        return data
+    ) -> Response:
+        """`artist.search`. `quota` runs only when this caller actually calls Last.fm (cache
+        miss and no identical fetch already running); public routes pass `PublicQuota.take`,
+        which raises `QuotaExceededError` to refuse the call."""
+
+        async def fetch() -> Response:
+            if quota is not None:
+                await quota()
+            return await self.call("artist.search", artist=artist, limit=limit)
+
+        return await self._cached(("artist.search", artist.casefold(), limit), fetch)
