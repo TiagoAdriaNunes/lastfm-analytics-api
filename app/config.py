@@ -1,8 +1,9 @@
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
-from pydantic import BaseModel, Field, PositiveFloat
+from pydantic import BaseModel, PositiveFloat, StringConstraints
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -44,7 +45,8 @@ class Settings(BaseSettings):
     lastfm_api_key: str
     lastfm_api_secret: str = ""
     # Clients must send this in the `X-API-Key` header. Required, so the app never starts open.
-    service_api_key: str = Field(min_length=16)
+    # Stripped because values pasted into a hosting dashboard often carry a stray newline/space.
+    service_api_key: Annotated[str, StringConstraints(strip_whitespace=True, min_length=16)]
 
     lastfm: LastFMSettings
     http: HTTPSettings
