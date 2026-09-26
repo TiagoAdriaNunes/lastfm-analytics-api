@@ -10,6 +10,10 @@ lastfm:
   # Requests per second to Last.fm, evenly spaced, shared by the whole app. Last.fm's ToS
   # historically allowed 5 req/s averaged over 5 minutes; we keep a safety margin.
   rate_limit: 2.0
+  # Extra cap for the public (no API key) example endpoints, in Last.fm calls per second, also
+  # evenly spaced. Uncached public requests beyond it get 429 instead of waiting, so anonymous
+  # traffic can't use up the shared budget above. 0.5 = one call every 2s.
+  public_rate_limit: 0.5
   # Retries for rate-limited (29) and temporary (8, 11, 16) Last.fm errors.
   max_retries: 2
   # Seconds before the first retry; doubles on each attempt (1s, 2s, ...).

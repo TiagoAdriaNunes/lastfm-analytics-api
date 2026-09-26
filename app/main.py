@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI
 
 from app.config import get_settings
 from app.dependencies import require_api_key
-from app.routers import artists
+from app.routers import artists, examples
 from app.services.cache import TTLCache
 
 
@@ -23,16 +23,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.lastfm_cache = TTLCache(ttl=settings.lastfm.cache_ttl)
         # One call every 1/rate seconds, shared by every request (max_rate=1 disables bursts).
         app.state.lastfm_limiter = AsyncLimiter(1, 1 / settings.lastfm.rate_limit)
+        # Extra, stricter budget for the public example endpoints (on top of the shared one).
+        app.state.public_limiter = AsyncLimiter(1, 1 / settings.lastfm.public_rate_limit)
         yield
 
+
+REPO_URL = "https://github.com/TiagoAdriaNunes/lastfm-analytics-api"
 
 app = FastAPI(
     title="Last.fm Analytics API",
     version="0.1.0",
     description=(
-        "All endpoints except `/health` require the `X-API-Key` header. "
-        "Click **Authorize** and paste your key to try them here."
+        "All endpoints except `/health` and `/examples/*` require the `X-API-Key` header. "
+        "Click **Authorize** and paste your key to try them here. "
+        "The `/examples` endpoints are public so you can try the API without a key."
     ),
+    openapi_external_docs={"description": "Source code on GitHub", "url": REPO_URL},
+    license_info={"name": "MIT", "url": f"{REPO_URL}/blob/main/LICENSE"},
     lifespan=lifespan,
     # Keep the key entered via "Authorize" across page reloads (stored in the browser).
     swagger_ui_parameters={"persistAuthorization": True},
@@ -43,6 +50,8 @@ app.include_router(
     dependencies=[Depends(require_api_key)],
     responses={401: {"description": "Invalid or missing `X-API-Key` header"}},
 )
+# Public on purpose: a no-key way to try the API. Protected by its own quota instead (see router).
+app.include_router(examples.router)
 
 
 @app.get("/health", tags=["health"])

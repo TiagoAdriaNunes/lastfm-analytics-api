@@ -1,5 +1,8 @@
 import httpx2
+from aiolimiter import AsyncLimiter
 
+from app.main import app
+from tests.test_examples import SEARCH_RESPONSE
 from tests.test_lastfm import MOCK_RESPONSE
 
 
@@ -72,3 +75,33 @@ def test_artist_is_required_and_not_blank(client):
     assert client.get("/artists/similar", params={"artist": ""}).status_code == 422
     assert client.get("/artists/similar", params={"artist": "   "}).status_code == 422
     assert client.get("/artists/similar", params={"artist": "x" * 201}).status_code == 422
+
+
+def test_search_artists(client, lastfm_mock):
+    route = lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
+
+    response = client.get("/artists/search", params={"artist": "radiohead", "limit": 50})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1234
+    assert [a["name"] for a in body["artists"]] == ["Radiohead", "Radiohead Tribute"]
+    sent = route.last_request.url.params
+    assert sent["method"] == "artist.search"
+    assert sent["limit"] == "50"
+
+
+def test_search_artists_ignores_public_quota(client, lastfm_mock):
+    # The keyed endpoint only uses the shared limiter, never the public example quota.
+    app.state.public_limiter = AsyncLimiter(1, 60)
+    lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
+
+    for artist in ["radiohead", "muse", "blur"]:
+        response = client.get("/artists/search", params={"artist": artist})
+        assert response.status_code == 200
+    assert lastfm_mock.call_count == 3
+
+
+def test_search_artists_limit_validation(client):
+    response = client.get("/artists/search", params={"artist": "x", "limit": 101})
+    assert response.status_code == 422

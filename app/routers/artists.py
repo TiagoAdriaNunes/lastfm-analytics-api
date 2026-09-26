@@ -6,8 +6,10 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.dependencies import LastFMDep
 from app.schemas.artist import (
+    ArtistSearchResponse,
     SimilarArtistsNetwork,
     SimilarArtistsResponse,
+    parse_artist_search,
     parse_similar_artists,
 )
 from app.services.lastfm import NOT_FOUND_ERROR, RETRYABLE_ERRORS, LastFMError
@@ -39,6 +41,17 @@ ArtistQuery = Annotated[
     str,
     Query(min_length=1, max_length=200, pattern=r"\S", description="Artist name, e.g. AC/DC"),
 ]
+
+
+@router.get("/search", response_model=ArtistSearchResponse)
+async def search_artists(
+    artist: ArtistQuery,
+    lastfm: LastFMDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+) -> ArtistSearchResponse:
+    """Find artists on Last.fm by name (`artist.search`), with listener counts."""
+    data = await _call_lastfm(lastfm.search_artists(artist, limit=limit))
+    return parse_artist_search(data)
 
 
 @router.get("/similar", response_model=SimilarArtistsResponse)

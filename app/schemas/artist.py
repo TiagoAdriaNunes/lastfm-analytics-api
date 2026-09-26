@@ -32,6 +32,37 @@ def parse_similar_artists(data: dict[str, Any]) -> SimilarArtistsResponse:
     )
 
 
+class ArtistSearchResult(BaseModel):
+    name: str
+    listeners: int
+    mbid: str | None = None
+    url: str | None = None
+
+
+class ArtistSearchResponse(BaseModel):
+    query: str
+    total: int  # matches on Last.fm, not just the ones returned
+    artists: list[ArtistSearchResult]
+
+
+def parse_artist_search(data: dict[str, Any]) -> ArtistSearchResponse:
+    results = data.get("results", {})
+    artists = results.get("artistmatches", {}).get("artist", [])
+    return ArtistSearchResponse(
+        query=results.get("@attr", {}).get("for", ""),
+        total=int(results.get("opensearch:totalResults") or 0),
+        artists=[
+            ArtistSearchResult(
+                name=a["name"],
+                listeners=int(a.get("listeners") or 0),
+                mbid=a.get("mbid") or None,
+                url=a.get("url"),
+            )
+            for a in artists
+        ],
+    )
+
+
 class NetworkNode(BaseModel):
     id: int
     name: str
