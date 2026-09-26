@@ -1,7 +1,7 @@
 import httpx2
-from aiolimiter import AsyncLimiter
 
 from app.main import app
+from app.services.quota import PublicQuota
 from tests.test_examples import SEARCH_RESPONSE
 from tests.test_lastfm import MOCK_RESPONSE
 
@@ -93,7 +93,7 @@ def test_search_artists(client, lastfm_mock):
 
 def test_search_artists_ignores_public_quota(client, lastfm_mock):
     # The keyed endpoint only uses the shared limiter, never the public example quota.
-    app.state.public_limiter = AsyncLimiter(1, 60)
+    app.state.public_quota = PublicQuota(rate=1 / 60, client_rate=1 / 60, max_clients=10)
     lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
 
     for artist in ["radiohead", "muse", "blur"]:

@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import httpx2
@@ -25,10 +26,6 @@ DOUBLE_DECODED_METHODS = {
     "track.getSimilar",
 }
 DOUBLE_DECODED_PARAMS = {"artist", "track"}
-
-
-class QuotaExceededError(Exception):
-    """The caller's own budget of Last.fm calls is used up (see `search_artists`)."""
 
 
 class LastFMError(Exception):
@@ -108,18 +105,18 @@ class LastFMClient:
         return data
 
     async def search_artists(
-        self, artist: str, limit: int | None = None, quota: AsyncLimiter | None = None
+        self,
+        artist: str,
+        limit: int | None = None,
+        quota: Callable[[], Awaitable[None]] | None = None,
     ) -> dict[str, Any]:
-        """`artist.search`. `quota` is an extra limiter for unauthenticated callers: on a cache
-        miss it must have room right now or `QuotaExceededError` is raised (no queueing), so
-        public traffic can only use that slice of the shared Last.fm budget."""
+        """`artist.search`. `quota` runs only on a cache miss, before calling Last.fm; public
+        routes pass `PublicQuota.take`, which raises `QuotaExceededError` to refuse the call."""
         key = ("artist.search", artist.casefold(), limit)
         if self._cache is not None and (cached := self._cache.get(key)) is not None:
             return cached
         if quota is not None:
-            if not quota.has_capacity():
-                raise QuotaExceededError
-            await quota.acquire()  # has capacity, so this returns without waiting
+            await quota()
         data = await self.call("artist.search", artist=artist, limit=limit)
         if self._cache is not None:
             self._cache.set(key, data)

@@ -52,10 +52,11 @@ hits don't count. So an uncached network with `limit=5` (6 calls) takes about 3s
 If Last.fm rate-limits us (error 29) or is temporarily down (8, 11, 16), the call is retried twice with
 backoff (1s, 2s); if it still fails, the API returns `503` with `Retry-After: 60`.
 
-The public `/examples` endpoints have an extra budget on top of that: **one uncached Last.fm call every
-2s** (`lastfm.public_rate_limit`). Beyond it they return `429` with `Retry-After` right away instead of
-queueing, so anonymous traffic can never take more than a quarter of the shared budget. Cached
-searches are always served.
+The public `/examples` endpoints have extra limits on top of that (`examples` in `config.yaml`):
+**one uncached Last.fm call every 2s** for all anonymous callers together, and **one per second per
+client IP**. Beyond either they return `429` with `Retry-After` right away instead of queueing. They
+also have their own small cache, so anonymous traffic can't push out the entries the authenticated
+endpoints rely on. Cached searches are always served.
 
 ## Authentication
 

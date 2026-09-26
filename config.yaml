@@ -10,16 +10,25 @@ lastfm:
   # Requests per second to Last.fm, evenly spaced, shared by the whole app. Last.fm's ToS
   # historically allowed 5 req/s averaged over 5 minutes; we keep a safety margin.
   rate_limit: 2.0
-  # Extra cap for the public (no API key) example endpoints, in Last.fm calls per second, also
-  # evenly spaced. Uncached public requests beyond it get 429 instead of waiting, so anonymous
-  # traffic can't use up the shared budget above. 0.5 = one call every 2s.
-  public_rate_limit: 0.5
   # Retries for rate-limited (29) and temporary (8, 11, 16) Last.fm errors.
   max_retries: 2
   # Seconds before the first retry; doubles on each attempt (1s, 2s, ...).
   retry_backoff: 1.0
   # How long Last.fm responses are cached in memory, in seconds.
   cache_ttl: 3600
+
+# Public (no API key) example endpoints. Their uncached Last.fm calls also pass the shared limiter
+# above; these caps come on top. Requests over a cap get 429 + Retry-After right away (no waiting).
+examples:
+  # Calls per second for all anonymous callers together. 0.5 = one call every 2s.
+  rate_limit: 0.5
+  # Calls per second per client IP. 1.0 = one uncached search per second per caller.
+  client_rate_limit: 1.0
+  # How many client IPs are tracked at once (oldest dropped first).
+  max_clients: 4096
+  # Entries in the public endpoints' own response cache, kept apart from the main cache so public
+  # traffic can't push out the entries authenticated requests rely on. Same TTL (lastfm.cache_ttl).
+  cache_size: 256
 
 http:
   # Per-request timeout to Last.fm, in seconds.

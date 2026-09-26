@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.dependencies import require_api_key
 from app.routers import artists, examples
 from app.services.cache import TTLCache
+from app.services.quota import PublicQuota
 
 
 @asynccontextmanager
@@ -23,8 +24,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.lastfm_cache = TTLCache(ttl=settings.lastfm.cache_ttl)
         # One call every 1/rate seconds, shared by every request (max_rate=1 disables bursts).
         app.state.lastfm_limiter = AsyncLimiter(1, 1 / settings.lastfm.rate_limit)
-        # Extra, stricter budget for the public example endpoints (on top of the shared one).
-        app.state.public_limiter = AsyncLimiter(1, 1 / settings.lastfm.public_rate_limit)
+        # Public example endpoints: their own cache and call budget (on top of the shared limiter).
+        app.state.public_cache = TTLCache(
+            ttl=settings.lastfm.cache_ttl, maxsize=settings.examples.cache_size
+        )
+        app.state.public_quota = PublicQuota(
+            settings.examples.rate_limit,
+            settings.examples.client_rate_limit,
+            settings.examples.max_clients,
+        )
         yield
 
 
@@ -50,7 +58,7 @@ app.include_router(
     dependencies=[Depends(require_api_key)],
     responses={401: {"description": "Invalid or missing `X-API-Key` header"}},
 )
-# Public on purpose: a no-key way to try the API. Protected by its own quota instead (see router).
+# Public on purpose: a no-key way to try the API. Protected by `PublicQuota` instead.
 app.include_router(examples.router)
 
 

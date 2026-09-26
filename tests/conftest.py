@@ -5,7 +5,8 @@ os.environ.setdefault("LASTFM_API_SECRET", "test-secret")
 os.environ["SERVICE_API_KEY"] = TEST_SERVICE_API_KEY = "test-service-api-key"
 # Keep tests fast: effectively no pacing and no retry sleeps.
 os.environ["LASTFM__RATE_LIMIT"] = "1000"
-os.environ["LASTFM__PUBLIC_RATE_LIMIT"] = "1000"
+os.environ["EXAMPLES__RATE_LIMIT"] = "1000"
+os.environ["EXAMPLES__CLIENT_RATE_LIMIT"] = "1000"
 os.environ["LASTFM__RETRY_BACKOFF"] = "0"
 
 from collections.abc import Callable, Iterable  # noqa: E402
