@@ -7,10 +7,18 @@ from fastapi import APIRouter, HTTPException, Query, status
 from app.config import get_settings
 from app.dependencies import LastFMDep
 from app.schemas.artist import (
+    ArtistInfo,
     ArtistSearchResponse,
+    ArtistTagsResponse,
+    ArtistTopAlbumsResponse,
+    ArtistTopTracksResponse,
     SimilarArtistsNetwork,
     SimilarArtistsResponse,
+    parse_artist_info,
     parse_artist_search,
+    parse_artist_tags,
+    parse_artist_top_albums,
+    parse_artist_top_tracks,
     parse_similar_artists,
 )
 from app.services.lastfm import NOT_FOUND_ERROR, RETRYABLE_ERRORS, LastFMError
@@ -53,6 +61,46 @@ async def search_artists(
     """Find artists on Last.fm by name (`artist.search`), with listener counts."""
     data = await _call_lastfm(lastfm.search_artists(artist, limit=limit))
     return parse_artist_search(data)
+
+
+@router.get("/info", response_model=ArtistInfo)
+async def get_artist_info(artist: ArtistQuery, lastfm: LastFMDep) -> ArtistInfo:
+    """Artist details (`artist.getInfo`): listener and play counts, top tag names."""
+    data = await _call_lastfm(lastfm.get_artist_info(artist))
+    return parse_artist_info(data)
+
+
+@router.get("/tags", response_model=ArtistTagsResponse)
+async def get_artist_tags(
+    artist: ArtistQuery,
+    lastfm: LastFMDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 5,
+) -> ArtistTagsResponse:
+    """An artist's most-applied Last.fm tags (`artist.getTopTags`), usable as genres."""
+    data = await _call_lastfm(lastfm.get_artist_top_tags(artist))
+    return parse_artist_tags(data, limit=limit)
+
+
+@router.get("/albums", response_model=ArtistTopAlbumsResponse)
+async def get_artist_top_albums(
+    artist: ArtistQuery,
+    lastfm: LastFMDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+) -> ArtistTopAlbumsResponse:
+    """An artist's most played albums (`artist.getTopAlbums`)."""
+    data = await _call_lastfm(lastfm.get_artist_top_albums(artist, limit=limit))
+    return parse_artist_top_albums(data)
+
+
+@router.get("/tracks", response_model=ArtistTopTracksResponse)
+async def get_artist_top_tracks(
+    artist: ArtistQuery,
+    lastfm: LastFMDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+) -> ArtistTopTracksResponse:
+    """An artist's most played tracks (`artist.getTopTracks`)."""
+    data = await _call_lastfm(lastfm.get_artist_top_tracks(artist, limit=limit))
+    return parse_artist_top_tracks(data)
 
 
 @router.get("/similar", response_model=SimilarArtistsResponse)

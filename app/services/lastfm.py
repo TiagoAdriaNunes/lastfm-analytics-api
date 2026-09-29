@@ -22,7 +22,10 @@ SIGNED_METHODS = {"auth.getSession", "track.scrobble"}
 DOUBLE_DECODED_METHODS = {
     "artist.getInfo",
     "artist.getSimilar",
+    "artist.getTopAlbums",
+    "artist.getTopTags",
     "artist.getTopTracks",
+    "track.getInfo",
     "track.getSimilar",
 }
 DOUBLE_DECODED_PARAMS = {"artist", "track"}
@@ -155,6 +158,92 @@ class LastFMClient:
         return await self._cached(
             ("artist.getSimilar", artist.casefold(), limit),
             lambda: self.call("artist.getSimilar", artist=artist, limit=limit, autocorrect=1),
+        )
+
+    async def get_artist_info(self, artist: str) -> LastFMPayload:
+        return await self._cached(
+            ("artist.getInfo", artist.casefold()),
+            lambda: self.call("artist.getInfo", artist=artist, autocorrect=1),
+        )
+
+    async def get_artist_top_tags(self, artist: str) -> LastFMPayload:
+        # No `limit` on Last.fm's side: it always returns the full list, so callers truncate.
+        return await self._cached(
+            ("artist.getTopTags", artist.casefold()),
+            lambda: self.call("artist.getTopTags", artist=artist, autocorrect=1),
+        )
+
+    async def get_artist_top_albums(self, artist: str, limit: int | None = None) -> LastFMPayload:
+        return await self._cached(
+            ("artist.getTopAlbums", artist.casefold(), limit),
+            lambda: self.call("artist.getTopAlbums", artist=artist, limit=limit, autocorrect=1),
+        )
+
+    async def get_artist_top_tracks(self, artist: str, limit: int | None = None) -> LastFMPayload:
+        return await self._cached(
+            ("artist.getTopTracks", artist.casefold(), limit),
+            lambda: self.call("artist.getTopTracks", artist=artist, limit=limit, autocorrect=1),
+        )
+
+    async def get_album_info(self, artist: str, album: str) -> LastFMPayload:
+        return await self._cached(
+            ("album.getInfo", artist.casefold(), album.casefold()),
+            lambda: self.call("album.getInfo", artist=artist, album=album, autocorrect=1),
+        )
+
+    async def get_album_top_tags(self, artist: str, album: str) -> LastFMPayload:
+        # Like artist.getTopTags: no `limit`, callers truncate.
+        return await self._cached(
+            ("album.getTopTags", artist.casefold(), album.casefold()),
+            lambda: self.call("album.getTopTags", artist=artist, album=album, autocorrect=1),
+        )
+
+    async def search_albums(self, album: str, limit: int | None = None) -> LastFMPayload:
+        return await self._cached(
+            ("album.search", album.casefold(), limit),
+            lambda: self.call("album.search", album=album, limit=limit),
+        )
+
+    async def get_track_info(self, artist: str, track: str) -> LastFMPayload:
+        return await self._cached(
+            ("track.getInfo", artist.casefold(), track.casefold()),
+            lambda: self.call("track.getInfo", artist=artist, track=track, autocorrect=1),
+        )
+
+    async def get_similar_tracks(
+        self, artist: str, track: str, limit: int | None = None
+    ) -> LastFMPayload:
+        return await self._cached(
+            ("track.getSimilar", artist.casefold(), track.casefold(), limit),
+            lambda: self.call(
+                "track.getSimilar", artist=artist, track=track, limit=limit, autocorrect=1
+            ),
+        )
+
+    async def get_track_top_tags(self, artist: str, track: str) -> LastFMPayload:
+        # Like artist.getTopTags: no `limit`, callers truncate.
+        return await self._cached(
+            ("track.getTopTags", artist.casefold(), track.casefold()),
+            lambda: self.call("track.getTopTags", artist=artist, track=track, autocorrect=1),
+        )
+
+    async def search_tracks(
+        self, track: str, artist: str | None = None, limit: int | None = None
+    ) -> LastFMPayload:
+        return await self._cached(
+            ("track.search", track.casefold(), artist and artist.casefold(), limit),
+            lambda: self.call("track.search", track=track, artist=artist, limit=limit),
+        )
+
+    async def get_top_tags(self, limit: int | None = None) -> LastFMPayload:
+        return await self._cached(
+            ("chart.getTopTags", limit), lambda: self.call("chart.getTopTags", limit=limit)
+        )
+
+    async def get_tag_top_artists(self, tag: str, limit: int | None = None) -> LastFMPayload:
+        return await self._cached(
+            ("tag.getTopArtists", tag.casefold(), limit),
+            lambda: self.call("tag.getTopArtists", tag=tag, limit=limit),
         )
 
     async def search_artists(

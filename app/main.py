@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI
 
 from app.config import get_settings
 from app.dependencies import require_api_key
-from app.routers import artists, examples
+from app.routers import albums, artists, examples, tags, tracks
 from app.services.cache import TTLCache
 from app.services.quota import PublicQuota
 
@@ -55,11 +55,12 @@ app = FastAPI(
     swagger_ui_parameters={"persistAuthorization": True},
 )
 # /health stays public (platform health checks); everything else needs the X-API-Key header.
-app.include_router(
-    artists.router,
-    dependencies=[Depends(require_api_key)],
-    responses={401: {"description": "Invalid or missing `X-API-Key` header"}},
-)
+for router in (artists.router, albums.router, tracks.router, tags.router):
+    app.include_router(
+        router,
+        dependencies=[Depends(require_api_key)],
+        responses={401: {"description": "Invalid or missing `X-API-Key` header"}},
+    )
 # Public on purpose: a no-key way to try the API. Protected by `PublicQuota` instead.
 app.include_router(examples.router)
 
