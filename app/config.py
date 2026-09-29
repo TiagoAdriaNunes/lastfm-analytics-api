@@ -1,4 +1,5 @@
 import os
+import tomllib
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Self
@@ -12,6 +13,11 @@ from pydantic_settings import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# Single source of truth for the version: pyproject.toml (the project is virtual in uv, so it has
+# no installed metadata for importlib.metadata to read).
+APP_VERSION: str = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text("utf-8"))["project"][
+    "version"
+]
 
 
 def config_file() -> Path:

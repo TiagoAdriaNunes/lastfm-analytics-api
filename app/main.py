@@ -5,7 +5,7 @@ import httpx2
 from aiolimiter import AsyncLimiter
 from fastapi import APIRouter, Depends, FastAPI
 
-from app.config import get_settings
+from app.config import APP_VERSION, get_settings
 from app.dependencies import require_api_key
 from app.routers import albums, artists, examples, tags, tracks
 from app.services.cache import MB, TTLCache
@@ -44,7 +44,7 @@ REPO_URL = "https://github.com/TiagoAdriaNunes/lastfm-analytics-api"
 
 app = FastAPI(
     title="Last.fm Analytics API",
-    version="0.1.0",
+    version=APP_VERSION,
     description=(
         "All endpoints except `/health` and `/examples/*` require the `X-API-Key` header. "
         "Click **Authorize** and paste your key to try them here. "

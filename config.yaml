@@ -43,5 +43,5 @@ examples:
 http:
   # Per-request timeout to Last.fm, in seconds.
   timeout: 10.0
-  # Last.fm asks for an identifiable User-Agent.
-  user_agent: lastfm-analytics-api/0.1.0 (+https://github.com/TiagoAdriaNunes/lastfm-analytics-api)
+  # Last.fm asks for an identifiable User-Agent. Keep the version in sync with pyproject.toml (tested).
+  user_agent: lastfm-analytics-api/0.2.0 (+https://github.com/TiagoAdriaNunes/lastfm-analytics-api)
