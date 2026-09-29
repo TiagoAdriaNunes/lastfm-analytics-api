@@ -231,7 +231,7 @@ class LastFMClient:
         self, track: str, artist: str | None = None, limit: int | None = None
     ) -> LastFMPayload:
         return await self._cached(
-            ("track.search", track.casefold(), artist and artist.casefold(), limit),
+            ("track.search", track.casefold(), artist.casefold() if artist else None, limit),
             lambda: self.call("track.search", track=track, artist=artist, limit=limit),
         )
 

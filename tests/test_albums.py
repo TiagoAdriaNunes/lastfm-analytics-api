@@ -154,3 +154,11 @@ def test_album_search_route(client, lastfm_mock):
 
 def test_album_search_limit_validation(client):
     assert client.get("/albums/search", params={"album": "x", "limit": 101}).status_code == 422
+
+
+def test_album_tags_not_found(client, lastfm_mock):
+    lastfm_mock.respond(httpx2.Response(200, json=NOT_FOUND))
+
+    response = client.get("/albums/tags", params={"artist": "Radiohead", "album": "nope"})
+
+    assert response.status_code == 404

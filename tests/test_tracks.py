@@ -1,4 +1,5 @@
 import httpx2
+import pytest
 
 from app.schemas.track import (
     parse_similar_tracks,
@@ -201,3 +202,13 @@ def test_track_search_validation(client):
     assert client.get("/tracks/search").status_code == 422
     assert client.get("/tracks/search", params={"track": "x", "artist": " "}).status_code == 422
     assert client.get("/tracks/search", params={"track": "x", "limit": 0}).status_code == 422
+
+
+@pytest.mark.parametrize("path", ["/tracks/similar", "/tracks/tags"])
+def test_track_routes_not_found(client, lastfm_mock, path):
+    lastfm_mock.respond(httpx2.Response(200, json=NOT_FOUND))
+
+    response = client.get(path, params={"artist": "Radiohead", "track": "nope"})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Track not found"

@@ -24,7 +24,7 @@ def optional_seconds(value: Any, *, ms: bool = False) -> int | None:
     return seconds or None
 
 
-def rank(item: dict[str, Any]) -> int:
+def parse_rank(item: dict[str, Any]) -> int:
     return int(item.get("@attr", {}).get("rank") or 0)
 
 

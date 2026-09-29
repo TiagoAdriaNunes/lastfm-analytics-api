@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from app.dependencies import ClientIP, PublicLastFMDep
-from app.routers.artists import ArtistQuery, _call_lastfm
+from app.routers.common import ArtistQuery, call_lastfm
 from app.schemas.artist import ArtistSearchResponse, parse_artist_search
 from app.services.quota import QuotaExceededError
 
@@ -34,7 +34,7 @@ async def search_artists(
     """Find artists on Last.fm by name (`artist.search`), with listener counts. No key needed."""
     quota = partial(request.app.state.public_quota.take, client_ip)
     try:
-        data = await _call_lastfm(lastfm.search_artists(artist, limit=limit, quota=quota))
+        data = await call_lastfm(lastfm.search_artists(artist, limit=limit, quota=quota))
     except QuotaExceededError as exc:
         # Includes the client IP, which is how to check `get_client_ip` picks the right one.
         logger.info("Public quota refused %s: %s", client_ip, exc)
