@@ -15,7 +15,16 @@ async def call_and_get_raw_query(lastfm_mock, method: str, **params) -> str:
 
 
 @pytest.mark.parametrize(
-    "method", ["artist.getInfo", "artist.getSimilar", "artist.getTopTracks", "track.getSimilar"]
+    "method",
+    [
+        "artist.getInfo",
+        "artist.getSimilar",
+        "artist.getTopAlbums",
+        "artist.getTopTags",
+        "artist.getTopTracks",
+        "track.getInfo",
+        "track.getSimilar",
+    ],
 )
 async def test_plus_is_double_encoded_for_double_decoding_methods(lastfm_mock, method):
     query = await call_and_get_raw_query(
@@ -25,9 +34,24 @@ async def test_plus_is_double_encoded_for_double_decoding_methods(lastfm_mock, m
     assert "track=C%252B%252B" in query
 
 
-async def test_plus_is_encoded_once_for_other_methods(lastfm_mock):
-    query = await call_and_get_raw_query(lastfm_mock, "artist.search", artist="+44")
+# Verified live: these decode once, and double-encoding breaks them (album.getInfo even answers
+# with an empty "Florence %2B The Machine" album instead of an error).
+@pytest.mark.parametrize(
+    "method",
+    [
+        "album.getInfo",
+        "album.getTopTags",
+        "album.search",
+        "artist.search",
+        "track.getTopTags",
+        "track.search",
+    ],
+)
+async def test_plus_is_encoded_once_for_other_methods(lastfm_mock, method):
+    query = await call_and_get_raw_query(lastfm_mock, method, artist="+44", album="+", track="1+1")
     assert "artist=%2B44" in query
+    assert "album=%2B" in query
+    assert "track=1%2B1" in query
 
 
 # Verified live against Last.fm: all of these resolve correctly with normal (single) encoding,

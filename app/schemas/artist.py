@@ -2,6 +2,15 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.common import (
+    WeightedTag,
+    as_list,
+    optional_int,
+    parse_weighted_tags,
+    rank,
+    tag_names,
+)
+
 
 class SimilarArtist(BaseModel):
     name: str
@@ -82,3 +91,106 @@ class SimilarArtistsNetwork(BaseModel):
     artist: str
     nodes: list[NetworkNode]
     edges: list[NetworkEdge]
+
+
+class ArtistInfo(BaseModel):
+    name: str
+    mbid: str | None = None
+    url: str | None = None
+    listeners: int | None = None
+    playcount: int | None = None
+    tags: list[str]
+
+
+def parse_artist_info(data: dict[str, Any]) -> ArtistInfo:
+    artist = data.get("artist", {})
+    stats = artist.get("stats") or {}
+    return ArtistInfo(
+        name=artist.get("name", ""),
+        mbid=artist.get("mbid") or None,
+        url=artist.get("url"),
+        listeners=optional_int(stats.get("listeners")),
+        playcount=optional_int(stats.get("playcount")),
+        tags=tag_names(artist.get("tags")),
+    )
+
+
+class ArtistTagsResponse(BaseModel):
+    artist: str
+    tags: list[WeightedTag]
+
+
+def parse_artist_tags(data: dict[str, Any], limit: int | None = None) -> ArtistTagsResponse:
+    payload = data.get("toptags", {})
+    return ArtistTagsResponse(
+        artist=payload.get("@attr", {}).get("artist", ""),
+        tags=parse_weighted_tags(payload, limit),
+    )
+
+
+class ArtistTopAlbum(BaseModel):
+    rank: int
+    name: str
+    playcount: int | None = None
+    mbid: str | None = None
+    url: str | None = None
+
+
+class ArtistTopAlbumsResponse(BaseModel):
+    artist: str
+    total: int  # the artist's albums on Last.fm, not just the ones returned
+    albums: list[ArtistTopAlbum]
+
+
+def parse_artist_top_albums(data: dict[str, Any]) -> ArtistTopAlbumsResponse:
+    payload = data.get("topalbums", {})
+    attr = payload.get("@attr", {})
+    return ArtistTopAlbumsResponse(
+        artist=attr.get("artist", ""),
+        total=int(attr.get("total") or 0),
+        albums=[
+            ArtistTopAlbum(
+                rank=rank(a),
+                name=a["name"],
+                playcount=optional_int(a.get("playcount")),
+                mbid=a.get("mbid") or None,
+                url=a.get("url"),
+            )
+            for a in as_list(payload.get("album"))
+        ],
+    )
+
+
+class ArtistTopTrack(BaseModel):
+    rank: int
+    name: str
+    playcount: int | None = None
+    listeners: int | None = None
+    mbid: str | None = None
+    url: str | None = None
+
+
+class ArtistTopTracksResponse(BaseModel):
+    artist: str
+    total: int  # the artist's tracks on Last.fm, not just the ones returned
+    tracks: list[ArtistTopTrack]
+
+
+def parse_artist_top_tracks(data: dict[str, Any]) -> ArtistTopTracksResponse:
+    payload = data.get("toptracks", {})
+    attr = payload.get("@attr", {})
+    return ArtistTopTracksResponse(
+        artist=attr.get("artist", ""),
+        total=int(attr.get("total") or 0),
+        tracks=[
+            ArtistTopTrack(
+                rank=rank(t),
+                name=t["name"],
+                playcount=optional_int(t.get("playcount")),
+                listeners=optional_int(t.get("listeners")),
+                mbid=t.get("mbid") or None,
+                url=t.get("url"),
+            )
+            for t in as_list(payload.get("track"))
+        ],
+    )
