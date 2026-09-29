@@ -1,5 +1,7 @@
 import pytest
 
+from app.config import APP_VERSION
+
 
 def test_health_is_public(client):
     client.headers.pop("X-API-Key")
@@ -55,3 +57,7 @@ def test_openapi_links_to_source_repo(client):
     repo = "https://github.com/TiagoAdriaNunes/lastfm-analytics-api"
     assert schema["externalDocs"]["url"] == repo
     assert schema["info"]["license"] == {"name": "MIT", "url": f"{repo}/blob/main/LICENSE"}
+
+
+def test_openapi_reports_the_app_version(client):
+    assert client.get("/openapi.json").json()["info"]["version"] == APP_VERSION

@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.config import PROJECT_ROOT, Settings
+from app.config import APP_VERSION, PROJECT_ROOT, Settings
 
 
 @pytest.fixture(autouse=True)
@@ -101,3 +101,7 @@ def test_examples_client_rate_must_be_below_global(monkeypatch, client_rate):
     monkeypatch.setenv("EXAMPLES__CLIENT_RATE_LIMIT", client_rate)
     with pytest.raises(ValidationError, match="client_rate_limit must be below"):
         load()
+
+
+def test_user_agent_carries_the_app_version():
+    assert load().http.user_agent.startswith(f"lastfm-analytics-api/{APP_VERSION} ")
