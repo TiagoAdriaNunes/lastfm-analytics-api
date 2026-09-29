@@ -101,6 +101,23 @@ In `/docs`, click **Authorize** and paste the key to try the endpoints.
   e.g. `LASTFM__RATE_LIMIT=1` or `HTTP__TIMEOUT=5`.
 - **Another file**: `APP_CONFIG_FILE=path/to/other.yaml`.
 
+## Logging
+
+Logs go to stdout via [loguru](https://github.com/Delgan/loguru), one line per event:
+
+- every request: method, path + query, status, duration, client IP (`/health` only at `DEBUG`);
+- every Last.fm call: method, params, status, duration, time spent waiting for the rate limiter;
+- Last.fm errors, retries and connection failures as warnings; cache hits at `DEBUG`;
+- uvicorn's own messages, in the same format (its access log is replaced by the request line).
+
+API keys are never logged: not the `X-API-Key` header, nor the Last.fm `api_key` (httpx's own
+request logs, which include it in the URL, are deliberately not collected).
+
+Settings (`log` in `config.yaml`): `LOG__LEVEL` (`DEBUG`, `INFO`, `WARNING`, `ERROR`; default
+`INFO`) and `LOG__FORMAT` (`text` or `json`). **On Railway set `LOG__FORMAT=json`**: each line is
+one JSON object whose fields you can filter on in the log explorer, e.g. `@status:502`,
+`@lastfm_method:artist.getInfo` or `@level:warning`.
+
 ## Tests
 
 ```sh
