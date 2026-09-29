@@ -28,7 +28,7 @@ def get_lastfm_client(request: Request) -> LastFMClient:
 
 
 def get_public_lastfm_client(request: Request) -> LastFMClient:
-    """Same client, but with the public endpoints' own cache (see `examples.cache_size`)."""
+    """Same client, but with the public endpoints' own cache (see `examples.cache_max_mb`)."""
     return _lastfm_client(request, request.app.state.public_cache)
 
 

@@ -22,7 +22,7 @@ class PublicQuota:
         self._client_period = 1 / client_rate
         self._limiter = AsyncLimiter(1, self._period)
         # An idle client's limiter is back to full after one period, so it can expire then.
-        self._clients = TTLCache(ttl=self._client_period, maxsize=max_clients)
+        self._clients = TTLCache(ttl=self._client_period, max_cost=max_clients)
 
     async def take(self, client: str) -> None:
         client_limiter = self._clients.get(client)
