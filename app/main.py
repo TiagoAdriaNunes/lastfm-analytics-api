@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from app.config import get_settings
 from app.dependencies import require_api_key
 from app.routers import albums, artists, examples, tags, tracks
-from app.services.cache import TTLCache
+from app.services.cache import MB, TTLCache
 from app.services.quota import PublicQuota
 
 
@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     ) as client:
         app.state.http_client = client
         app.state.lastfm_cache = TTLCache(
-            ttl=settings.lastfm.cache_ttl, maxsize=settings.lastfm.cache_size
+            ttl=settings.lastfm.cache_ttl, max_cost=settings.lastfm.cache_max_mb * MB
         )
         # One call every 1/rate seconds, shared by every request (max_rate=1 disables bursts).
         app.state.lastfm_limiter = AsyncLimiter(1, 1 / settings.lastfm.rate_limit)
@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.lastfm_inflight = {}
         # Public example endpoints: their own cache and call budget (on top of the shared limiter).
         app.state.public_cache = TTLCache(
-            ttl=settings.lastfm.cache_ttl, maxsize=settings.examples.cache_size
+            ttl=settings.lastfm.cache_ttl, max_cost=settings.examples.cache_max_mb * MB
         )
         app.state.public_quota = PublicQuota(
             settings.examples.rate_limit,

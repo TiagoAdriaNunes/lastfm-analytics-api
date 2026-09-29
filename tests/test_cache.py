@@ -3,8 +3,8 @@ import pytest
 
 from app.config import get_settings
 from app.main import app
-from app.services.cache import TTLCache
-from app.services.lastfm import LastFMClient
+from app.services.cache import MB, TTLCache
+from app.services.lastfm import LastFMClient, estimated_size
 from tests.test_lastfm import MOCK_RESPONSE
 
 
@@ -27,8 +27,10 @@ def test_ttl_cache_expires():
 
 
 @pytest.mark.usefixtures("client")  # starts the app lifespan
-def test_main_cache_size_comes_from_settings():
-    assert app.state.lastfm_cache._maxsize == get_settings().lastfm.cache_size
+def test_cache_budgets_come_from_settings():
+    settings = get_settings()
+    assert app.state.lastfm_cache._max_cost == settings.lastfm.cache_max_mb * MB
+    assert app.state.public_cache._max_cost == settings.examples.cache_max_mb * MB
 
 
 async def test_images_are_dropped_before_caching(lastfm_mock):
@@ -51,3 +53,55 @@ async def test_images_are_dropped_before_caching(lastfm_mock):
         "similarartists": {"artist": [{"name": "B", "match": "1"}], "@attr": {"artist": "A"}}
     }
     assert cache.get(("artist.getSimilar", "a", None)) == data
+
+
+def test_ttl_cache_evicts_oldest_until_the_new_entry_fits():
+    cache = TTLCache(ttl=60, max_cost=10)
+    cache.set("a", 1, cost=4)
+    cache.set("b", 2, cost=4)
+    cache.set("c", 3, cost=5)  # needs "a" gone (4 + 5 <= 10), not "b"
+    assert cache.get("a") is None
+    assert (cache.get("b"), cache.get("c")) == (2, 3)
+    assert cache.cost == 9
+
+
+def test_ttl_cache_skips_an_entry_bigger_than_the_budget():
+    cache = TTLCache(ttl=60, max_cost=10)
+    cache.set("a", 1, cost=4)
+    cache.set("huge", 2, cost=11)
+    assert cache.get("huge") is None
+    assert cache.get("a") == 1  # not evicted for nothing
+
+
+def test_ttl_cache_replacing_a_key_releases_its_old_cost():
+    cache = TTLCache(ttl=60, max_cost=10)
+    cache.set("a", 1, cost=6)
+    cache.set("a", 2, cost=3)
+    assert cache.get("a") == 2
+    assert cache.cost == 3
+
+
+def test_ttl_cache_expired_entry_releases_its_cost():
+    cache = TTLCache(ttl=-1, max_cost=10)
+    cache.set("a", 1, cost=6)
+    assert cache.get("a") is None
+    assert cache.cost == 0
+
+
+def test_ttl_cache_counts_entries_by_default():
+    cache = TTLCache(ttl=60, max_cost=2)
+    for key in "abc":
+        cache.set(key, key)
+    assert cache.get("a") is None
+    assert cache.cost == 2
+
+
+async def test_responses_are_cached_at_their_estimated_size(lastfm_mock):
+    lastfm_mock.respond(httpx2.Response(200, json=MOCK_RESPONSE))
+    cache = TTLCache(ttl=60, max_cost=100 * MB)
+    async with httpx2.AsyncClient(
+        base_url="https://ws.audioscrobbler.com/2.0/", transport=lastfm_mock.transport
+    ) as http:
+        data = await LastFMClient(http, "key", cache=cache).get_similar_artists("A")
+
+    assert cache.cost == estimated_size(data) > 0

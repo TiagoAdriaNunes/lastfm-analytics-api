@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 from collections.abc import Awaitable, Callable, Hashable
 from typing import Any
 
@@ -57,6 +58,13 @@ def _drop_images(obj: dict[str, Any]) -> dict[str, Any]:
     cache (artist images are only Last.fm's placeholder star anyway)."""
     obj.pop("image", None)
     return obj
+
+
+def estimated_size(data: LastFMPayload) -> int:
+    """Rough memory footprint of a parsed response, in bytes: 4x its JSON length. Measured RSS
+    per cached entry was 1.4-3.6x the JSON length (small dicts ~1.5x, 100-item lists ~3.5x), so
+    this errs on the safe side for the cache's MB budget."""
+    return 4 * len(json.dumps(data))
 
 
 class LastFMClient:
@@ -127,9 +135,12 @@ class LastFMClient:
             data = await asyncio.shield(self._join_or_start(key, fetch))
         # The shared fetch caches in its starter's cache; a caller that joined it may use another
         # (public vs keyed endpoints), so cache here as well.
-        if self._cache is not None:
-            self._cache.set(key, data)
+        self._store(key, data)
         return data
+
+    def _store(self, key: Hashable, data: LastFMPayload) -> None:
+        if self._cache is not None and self._cache.get(key) is None:
+            self._cache.set(key, data, cost=estimated_size(data))
 
     def _join_or_start(
         self, key: Hashable, fetch: Callable[[], Awaitable[LastFMPayload]]
@@ -146,8 +157,7 @@ class LastFMClient:
             data = await fetch()
             # Cache here too, not only in the waiters: if every waiter was cancelled, the call
             # has still been made and its result should serve the next request.
-            if self._cache is not None:
-                self._cache.set(key, data)
+            self._store(key, data)
             return data
 
         task = asyncio.ensure_future(run())

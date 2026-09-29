@@ -24,7 +24,7 @@ class LastFMSettings(BaseModel):
     max_retries: int
     retry_backoff: float
     cache_ttl: float
-    cache_size: PositiveInt
+    cache_max_mb: PositiveInt
     network_max_calls: PositiveInt
 
 
@@ -32,7 +32,7 @@ class ExamplesSettings(BaseModel):
     rate_limit: PositiveFloat
     client_rate_limit: PositiveFloat
     max_clients: PositiveInt
-    cache_size: PositiveInt
+    cache_max_mb: PositiveInt
 
     @model_validator(mode="after")
     def client_rate_below_global(self) -> Self:
