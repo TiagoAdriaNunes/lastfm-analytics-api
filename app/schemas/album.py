@@ -7,8 +7,8 @@ from app.schemas.common import (
     as_list,
     optional_int,
     optional_seconds,
+    parse_rank,
     parse_weighted_tags,
-    rank,
     search_total,
     tag_names,
 )
@@ -44,7 +44,7 @@ def parse_album_info(data: dict[str, Any]) -> AlbumInfo:
         tags=tag_names(album.get("tags")),
         tracks=[
             AlbumTrack(
-                rank=rank(t),
+                rank=parse_rank(t),
                 name=t["name"],
                 duration=optional_seconds(t.get("duration")),
                 url=t.get("url"),

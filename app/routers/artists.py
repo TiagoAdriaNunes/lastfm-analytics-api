@@ -1,11 +1,10 @@
-from collections.abc import Awaitable
 from typing import Annotated
 
-import httpx2
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.config import get_settings
 from app.dependencies import LastFMDep
+from app.routers.common import ArtistQuery, call_lastfm
 from app.schemas.artist import (
     ArtistInfo,
     ArtistSearchResponse,
@@ -21,35 +20,9 @@ from app.schemas.artist import (
     parse_artist_top_tracks,
     parse_similar_artists,
 )
-from app.services.lastfm import NOT_FOUND_ERROR, RETRYABLE_ERRORS, LastFMError
 from app.services.similar_network import fetch_similar_network, max_network_calls
 
 router = APIRouter(prefix="/artists", tags=["artists"])
-
-
-async def _call_lastfm[T](coro: Awaitable[T]) -> T:
-    """Translate Last.fm / transport failures into HTTP errors."""
-    try:
-        return await coro
-    except LastFMError as exc:
-        if exc.code == NOT_FOUND_ERROR:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, exc.message) from exc
-        if exc.code in RETRYABLE_ERRORS:
-            # Rate limited or temporarily down, and still failing after the client's retries.
-            raise HTTPException(
-                status.HTTP_503_SERVICE_UNAVAILABLE, exc.message, headers={"Retry-After": "60"}
-            ) from exc
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, exc.message) from exc
-    except httpx2.HTTPError as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Last.fm request failed") from exc
-
-
-# Query parameter, not a path segment: artist names can contain "/" (e.g. "AC/DC"), which would
-# split the URL path and never match a route, even when percent-encoded.
-ArtistQuery = Annotated[
-    str,
-    Query(min_length=1, max_length=200, pattern=r"\S", description="Artist name, e.g. AC/DC"),
-]
 
 
 @router.get("/search", response_model=ArtistSearchResponse)
@@ -59,14 +32,14 @@ async def search_artists(
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> ArtistSearchResponse:
     """Find artists on Last.fm by name (`artist.search`), with listener counts."""
-    data = await _call_lastfm(lastfm.search_artists(artist, limit=limit))
+    data = await call_lastfm(lastfm.search_artists(artist, limit=limit))
     return parse_artist_search(data)
 
 
 @router.get("/info", response_model=ArtistInfo)
 async def get_artist_info(artist: ArtistQuery, lastfm: LastFMDep) -> ArtistInfo:
     """Artist details (`artist.getInfo`): listener and play counts, top tag names."""
-    data = await _call_lastfm(lastfm.get_artist_info(artist))
+    data = await call_lastfm(lastfm.get_artist_info(artist))
     return parse_artist_info(data)
 
 
@@ -77,7 +50,7 @@ async def get_artist_tags(
     limit: Annotated[int, Query(ge=1, le=100)] = 5,
 ) -> ArtistTagsResponse:
     """An artist's most-applied Last.fm tags (`artist.getTopTags`), usable as genres."""
-    data = await _call_lastfm(lastfm.get_artist_top_tags(artist))
+    data = await call_lastfm(lastfm.get_artist_top_tags(artist))
     return parse_artist_tags(data, limit=limit)
 
 
@@ -88,7 +61,7 @@ async def get_artist_top_albums(
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> ArtistTopAlbumsResponse:
     """An artist's most played albums (`artist.getTopAlbums`)."""
-    data = await _call_lastfm(lastfm.get_artist_top_albums(artist, limit=limit))
+    data = await call_lastfm(lastfm.get_artist_top_albums(artist, limit=limit))
     return parse_artist_top_albums(data)
 
 
@@ -99,7 +72,7 @@ async def get_artist_top_tracks(
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> ArtistTopTracksResponse:
     """An artist's most played tracks (`artist.getTopTracks`)."""
-    data = await _call_lastfm(lastfm.get_artist_top_tracks(artist, limit=limit))
+    data = await call_lastfm(lastfm.get_artist_top_tracks(artist, limit=limit))
     return parse_artist_top_tracks(data)
 
 
@@ -109,7 +82,7 @@ async def get_similar_artists(
     lastfm: LastFMDep,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
 ) -> SimilarArtistsResponse:
-    data = await _call_lastfm(lastfm.get_similar_artists(artist, limit=limit))
+    data = await call_lastfm(lastfm.get_similar_artists(artist, limit=limit))
     return parse_similar_artists(data)
 
 
@@ -130,4 +103,4 @@ async def get_similar_artists_network(
             f"limit={limit} with depth={depth} can need {calls} Last.fm calls (max {max_calls}); "
             "lower limit or depth",
         )
-    return await _call_lastfm(fetch_similar_network(lastfm, artist, limit, depth))
+    return await call_lastfm(fetch_similar_network(lastfm, artist, limit, depth))

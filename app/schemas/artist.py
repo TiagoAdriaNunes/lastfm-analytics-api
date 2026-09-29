@@ -6,8 +6,9 @@ from app.schemas.common import (
     WeightedTag,
     as_list,
     optional_int,
+    parse_rank,
     parse_weighted_tags,
-    rank,
+    search_total,
     tag_names,
 )
 
@@ -59,7 +60,7 @@ def parse_artist_search(data: dict[str, Any]) -> ArtistSearchResponse:
     artists = results.get("artistmatches", {}).get("artist", [])
     return ArtistSearchResponse(
         query=results.get("@attr", {}).get("for", ""),
-        total=int(results.get("opensearch:totalResults") or 0),
+        total=search_total(results),
         artists=[
             ArtistSearchResult(
                 name=a["name"],
@@ -150,7 +151,7 @@ def parse_artist_top_albums(data: dict[str, Any]) -> ArtistTopAlbumsResponse:
         total=int(attr.get("total") or 0),
         albums=[
             ArtistTopAlbum(
-                rank=rank(a),
+                rank=parse_rank(a),
                 name=a["name"],
                 playcount=optional_int(a.get("playcount")),
                 mbid=a.get("mbid") or None,
@@ -184,7 +185,7 @@ def parse_artist_top_tracks(data: dict[str, Any]) -> ArtistTopTracksResponse:
         total=int(attr.get("total") or 0),
         tracks=[
             ArtistTopTrack(
-                rank=rank(t),
+                rank=parse_rank(t),
                 name=t["name"],
                 playcount=optional_int(t.get("playcount")),
                 listeners=optional_int(t.get("listeners")),

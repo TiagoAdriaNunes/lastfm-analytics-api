@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.schemas.common import as_list, rank
+from app.schemas.common import as_list, parse_rank
 
 # Popular Last.fm tags that describe the listener or their collection rather than the music, left
 # out of the genre list (same list as the R version).
@@ -79,7 +79,7 @@ def parse_tag_artists(data: dict[str, Any]) -> TagArtistsResponse:
         total=int(attr.get("total") or 0),
         artists=[
             TagArtist(
-                rank=rank(a),
+                rank=parse_rank(a),
                 name=a["name"],
                 mbid=a.get("mbid") or None,
                 url=a.get("url"),

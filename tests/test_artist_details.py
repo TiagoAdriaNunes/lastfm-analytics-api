@@ -1,4 +1,5 @@
 import httpx2
+import pytest
 
 from app.schemas.artist import (
     parse_artist_info,
@@ -196,3 +197,13 @@ def test_artist_top_tracks_route(client, lastfm_mock):
 def test_artist_top_limit_validation(client):
     for path in ["/artists/albums", "/artists/tracks"]:
         assert client.get(path, params={"artist": "x", "limit": 101}).status_code == 422
+
+
+@pytest.mark.parametrize("path", ["/artists/tags", "/artists/albums", "/artists/tracks"])
+def test_artist_routes_not_found(client, lastfm_mock, path):
+    lastfm_mock.respond(
+        httpx2.Response(
+            200, json={"error": 6, "message": "The artist you supplied could not be found"}
+        )
+    )
+    assert client.get(path, params={"artist": "nope"}).status_code == 404

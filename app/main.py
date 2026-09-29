@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 import httpx2
 from aiolimiter import AsyncLimiter
-from fastapi import Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 
 from app.config import get_settings
 from app.dependencies import require_api_key
@@ -55,12 +55,15 @@ app = FastAPI(
     swagger_ui_parameters={"persistAuthorization": True},
 )
 # /health stays public (platform health checks); everything else needs the X-API-Key header.
-for router in (artists.router, albums.router, tracks.router, tags.router):
-    app.include_router(
-        router,
-        dependencies=[Depends(require_api_key)],
-        responses={401: {"description": "Invalid or missing `X-API-Key` header"}},
-    )
+protected = APIRouter(
+    dependencies=[Depends(require_api_key)],
+    responses={401: {"description": "Invalid or missing `X-API-Key` header"}},
+)
+protected.include_router(artists.router)
+protected.include_router(albums.router)
+protected.include_router(tracks.router)
+protected.include_router(tags.router)
+app.include_router(protected)
 # Public on purpose: a no-key way to try the API. Protected by `PublicQuota` instead.
 app.include_router(examples.router)
 
