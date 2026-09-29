@@ -16,6 +16,10 @@ lastfm:
   retry_backoff: 1.0
   # How long Last.fm responses are cached in memory, in seconds.
   cache_ttl: 3600
+  # Max entries in the main response cache, oldest dropped first. Measured in memory (image URLs
+  # are stripped before caching): ~3-30 KB for *.getInfo, tags and small lists, up to ~105 KB for
+  # a limit=100 list. 4096 entries is typically well under 150 MB; worst case (all big lists) ~430 MB.
+  cache_size: 4096
   # Max worst-case Last.fm calls for one /artists/similar/network request (1 + limit + limit² for
   # depth 3). Bigger requests get 422. 60 calls = ~30s uncached at 2 req/s; allows depth 3 up to limit 7.
   network_max_calls: 60

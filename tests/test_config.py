@@ -24,6 +24,7 @@ def test_loads_committed_config_yaml():
     assert settings.lastfm.base_url == "https://ws.audioscrobbler.com/2.0/"
     assert settings.lastfm.rate_limit == 2.0
     assert settings.lastfm.max_retries == 2
+    assert settings.lastfm.cache_size == 4096
     assert settings.http.user_agent.startswith("lastfm-analytics-api/")
     assert (PROJECT_ROOT / "config.yaml").is_file()
 
@@ -49,6 +50,7 @@ def test_app_config_file_selects_another_yaml(monkeypatch, tmp_path):
         "  max_retries: 0\n"
         "  retry_backoff: 0\n"
         "  cache_ttl: 1\n"
+        "  cache_size: 3\n"
         "  network_max_calls: 10\n"
         "examples:\n"
         "  rate_limit: 0.1\n"
