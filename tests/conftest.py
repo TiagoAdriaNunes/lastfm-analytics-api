@@ -9,15 +9,19 @@ os.environ["EXAMPLES__RATE_LIMIT"] = "1000"
 os.environ["EXAMPLES__CLIENT_RATE_LIMIT"] = "500"  # must stay below EXAMPLES__RATE_LIMIT
 os.environ["LASTFM__RETRY_BACKOFF"] = "0"
 
-from collections.abc import Callable, Iterable  # noqa: E402
-from typing import Self  # noqa: E402
+from collections.abc import Callable, Iterable, Iterator  # noqa: E402
+from typing import TYPE_CHECKING, Self  # noqa: E402
 
 import httpx2  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from loguru import logger  # noqa: E402
 
 from app.config import get_settings  # noqa: E402
 from app.main import app  # noqa: E402
+
+if TYPE_CHECKING:
+    from loguru import Record
 
 Handler = Callable[[httpx2.Request], httpx2.Response]
 
@@ -81,3 +85,13 @@ def client(lastfm_mock: LastFMMock):
             transport=lastfm_mock.transport,
         )
         yield c
+
+
+@pytest.fixture
+def logs() -> Iterator[list["Record"]]:
+    """Loguru records emitted during the test, DEBUG and up (pytest's `caplog` only sees stdlib
+    logging). Each is a dict: `record["message"]`, `record["level"].name`, `record["extra"]`."""
+    records: list[Record] = []
+    handler_id = logger.add(lambda message: records.append(message.record), level="DEBUG")
+    yield records
+    logger.remove(handler_id)

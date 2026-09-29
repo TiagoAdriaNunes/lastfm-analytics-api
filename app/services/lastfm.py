@@ -1,11 +1,13 @@
 import asyncio
 import hashlib
 import json
+import time
 from collections.abc import Awaitable, Callable, Hashable
 from typing import Any
 
 import httpx2
 from aiolimiter import AsyncLimiter
+from loguru import logger
 
 from app.services.cache import TTLCache
 
@@ -67,6 +69,10 @@ def estimated_size(data: LastFMPayload) -> int:
     return 4 * len(json.dumps(data))
 
 
+def _ms_since(start: float) -> float:
+    return round((time.perf_counter() - start) * 1000, 1)
+
+
 class LastFMClient:
     def __init__(
         self,
@@ -90,6 +96,9 @@ class LastFMClient:
 
     async def call(self, method: str, **params: Any) -> dict[str, Any]:
         query = {k: v for k, v in params.items() if v is not None}
+        # What the caller asked for, for the logs: taken before `api_key`/`api_sig` are added and
+        # before the "+" pre-encoding, so it's safe to log and reads like the input.
+        log_params = dict(query)
         query |= {"method": method, "api_key": self._api_key, "format": "json"}
         if method in SIGNED_METHODS:
             query["api_sig"] = create_signature(query, self._api_secret)
@@ -99,26 +108,67 @@ class LastFMClient:
 
         for attempt in range(self._max_retries + 1):
             try:
-                return await self._request(query)
+                return await self._request(method, query, log_params)
             except LastFMError as exc:
                 if exc.code not in RETRYABLE_ERRORS or attempt == self._max_retries:
                     raise
-                await asyncio.sleep(self._retry_backoff * 2**attempt)
+                delay = self._retry_backoff * 2**attempt
+                logger.warning(
+                    "Retrying Last.fm {lastfm_method} in {delay}s after error {error_code} "
+                    "(retry {retry} of {max_retries})",
+                    lastfm_method=method,
+                    delay=delay,
+                    error_code=exc.code,
+                    retry=attempt + 1,
+                    max_retries=self._max_retries,
+                )
+                await asyncio.sleep(delay)
         raise AssertionError("unreachable")
 
-    async def _request(self, query: dict[str, Any]) -> dict[str, Any]:
+    async def _request(
+        self, method: str, query: dict[str, Any], log_params: dict[str, Any]
+    ) -> dict[str, Any]:
+        queued = time.perf_counter()
         if self._limiter is not None:
             await self._limiter.acquire()
-        response = await self._http.get("", params=query)
+        started = time.perf_counter()
+        # Never log `query` or an httpx error's text: both contain the URL with our `api_key`.
+        fields: dict[str, Any] = {
+            "lastfm_method": method,
+            "params": log_params,
+            "wait_ms": round((started - queued) * 1000, 1),
+        }
+        try:
+            response = await self._http.get("", params=query)
+        except httpx2.HTTPError as exc:
+            logger.warning(
+                "Last.fm {lastfm_method} failed: {error}",
+                error=type(exc).__name__,
+                duration_ms=_ms_since(started),
+                **fields,
+            )
+            raise
+        fields |= {"status": response.status_code, "duration_ms": _ms_since(started)}
         try:
             data = response.json(object_hook=_drop_images)
         except ValueError:
+            logger.warning("Last.fm {lastfm_method} -> HTTP {status}, not JSON", **fields)
             response.raise_for_status()
             raise
         # Last.fm reports errors in the body, sometimes with a 200 status.
         if "error" in data:
-            raise LastFMError(data["error"], data.get("message", "Unknown Last.fm error"))
-        response.raise_for_status()
+            error = LastFMError(data["error"], data.get("message", "Unknown Last.fm error"))
+            logger.warning(
+                "Last.fm {lastfm_method} -> error {error_code}: {error_message}",
+                error_code=error.code,
+                error_message=error.message,
+                **fields,
+            )
+            raise error
+        if response.is_error:
+            logger.warning("Last.fm {lastfm_method} -> HTTP {status}", **fields)
+            response.raise_for_status()
+        logger.info("Last.fm {lastfm_method} -> {status} in {duration_ms} ms", **fields)
         return data
 
     async def _cached(
@@ -128,6 +178,7 @@ class LastFMClient:
         (shared app-wide), concurrent misses for the same key share one fetch ("single-flight")
         instead of each calling Last.fm. Errors reach every waiter and are never cached."""
         if self._cache is not None and (cached := self._cache.get(key)) is not None:
+            logger.debug("Cache hit for {cache_key}", cache_key=key)
             return cached
         if self._inflight is None:
             data = await fetch()
@@ -151,6 +202,7 @@ class LastFMClient:
         # A finished task can linger until its done-callback runs; don't hand out its (possibly
         # failed) result, start a fresh fetch instead.
         if task is not None and not task.done():
+            logger.debug("Joining in-flight Last.fm fetch for {cache_key}", cache_key=key)
             return task
 
         async def run() -> LastFMPayload:

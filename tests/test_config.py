@@ -57,6 +57,9 @@ def test_app_config_file_selects_another_yaml(monkeypatch, tmp_path):
         "  client_rate_limit: 0.01\n"
         "  max_clients: 10\n"
         "  cache_max_mb: 5\n"
+        "log:\n"
+        "  level: DEBUG\n"
+        "  format: json\n"
         "http:\n"
         "  timeout: 1\n"
         "  user_agent: test\n"
@@ -105,3 +108,12 @@ def test_examples_client_rate_must_be_below_global(monkeypatch, client_rate):
 
 def test_user_agent_carries_the_app_version():
     assert load().http.user_agent.startswith(f"lastfm-analytics-api/{APP_VERSION} ")
+
+
+def test_log_settings(monkeypatch):
+    assert (load().log.level, load().log.format) == ("INFO", "text")
+    monkeypatch.setenv("LOG__FORMAT", "json")
+    assert load().log.format == "json"
+    monkeypatch.setenv("LOG__FORMAT", "xml")
+    with pytest.raises(ValidationError):
+        load()
