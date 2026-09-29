@@ -40,6 +40,13 @@ examples:
   # requests rely on. Same TTL (lastfm.cache_ttl). Public searches are small (limit <= 10), ~6 KB each.
   cache_max_mb: 8
 
+log:
+  # DEBUG adds cache hits and /health requests; INFO logs every request and Last.fm call.
+  level: INFO
+  # "text" for reading in a terminal, "json" for Railway (one object per line; its log explorer
+  # turns the fields into filters, e.g. @status:502). Set LOG__FORMAT=json on Railway.
+  format: text
+
 http:
   # Per-request timeout to Last.fm, in seconds.
   timeout: 10.0

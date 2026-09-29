@@ -12,6 +12,8 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
+from app.logs import LogFormat, LogLevel
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # Single source of truth for the version: pyproject.toml (the project is virtual in uv, so it has
 # no installed metadata for importlib.metadata to read).
@@ -48,6 +50,11 @@ class ExamplesSettings(BaseModel):
         return self
 
 
+class LogSettings(BaseModel):
+    level: LogLevel
+    format: LogFormat
+
+
 class HTTPSettings(BaseModel):
     timeout: PositiveFloat
     user_agent: str
@@ -73,6 +80,7 @@ class Settings(BaseSettings):
     lastfm: LastFMSettings
     examples: ExamplesSettings
     http: HTTPSettings
+    log: LogSettings
 
     @classmethod
     def settings_customise_sources(

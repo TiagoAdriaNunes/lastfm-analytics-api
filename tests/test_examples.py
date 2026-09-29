@@ -169,12 +169,13 @@ def test_public_results_use_their_own_cache(client, lastfm_mock):
     assert lastfm_mock.call_count == 2
 
 
-def test_refusal_is_logged_with_client_ip(client, lastfm_mock, caplog):
+def test_refusal_is_logged_with_client_ip(client, lastfm_mock, logs):
     app.state.public_quota = PublicQuota(rate=1000, client_rate=1 / 60, max_clients=10)
     lastfm_mock.respond(httpx2.Response(200, json=SEARCH_RESPONSE))
 
     search(client, "radiohead", ip="1.1.1.1")
-    with caplog.at_level("INFO", logger="uvicorn.error"):
-        search(client, "muse", ip="1.1.1.1")
+    search(client, "muse", ip="1.1.1.1")
 
-    assert "Public quota refused 1.1.1.1" in caplog.text
+    [refusal] = [r for r in logs if r["message"].startswith("Public quota refused")]
+    assert refusal["message"].startswith("Public quota refused 1.1.1.1:")
+    assert refusal["extra"]["client_ip"] == "1.1.1.1"
