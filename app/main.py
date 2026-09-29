@@ -21,7 +21,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         headers={"User-Agent": settings.http.user_agent},
     ) as client:
         app.state.http_client = client
-        app.state.lastfm_cache = TTLCache(ttl=settings.lastfm.cache_ttl)
+        app.state.lastfm_cache = TTLCache(
+            ttl=settings.lastfm.cache_ttl, maxsize=settings.lastfm.cache_size
+        )
         # One call every 1/rate seconds, shared by every request (max_rate=1 disables bursts).
         app.state.lastfm_limiter = AsyncLimiter(1, 1 / settings.lastfm.rate_limit)
         # Last.fm fetches in progress, so identical concurrent requests share one call.

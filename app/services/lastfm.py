@@ -51,6 +51,14 @@ def create_signature(params: dict[str, Any], secret: str) -> str:
     return hashlib.md5((base + secret).encode("utf-8")).hexdigest()
 
 
+def _drop_images(obj: dict[str, Any]) -> dict[str, Any]:
+    """`json.loads` hook: strip every `image` list while parsing. We never return images, and on
+    a limit=100 list they are ~70-90% of the payload's memory, which would otherwise sit in the
+    cache (artist images are only Last.fm's placeholder star anyway)."""
+    obj.pop("image", None)
+    return obj
+
+
 class LastFMClient:
     def __init__(
         self,
@@ -95,7 +103,7 @@ class LastFMClient:
             await self._limiter.acquire()
         response = await self._http.get("", params=query)
         try:
-            data = response.json()
+            data = response.json(object_hook=_drop_images)
         except ValueError:
             response.raise_for_status()
             raise

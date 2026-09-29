@@ -24,10 +24,27 @@ Run `make` to list all shortcuts: `dev`, `run`, `test`, `lint`, `format`, `check
 | GET | `/artists/search?artist=Radiohead&limit=10` | Search artists by name, with listener counts (`limit` 1–100) |
 | GET | `/artists/similar?artist=Radiohead&limit=10` | Artists similar to `artist`, with a 0–1 match score |
 | GET | `/artists/similar/network?artist=Radiohead&limit=5&depth=2` | Similar-artist network (`nodes` + `edges`) for graph visualisation, `depth` 1–3 levels (default 2) |
+| GET | `/artists/info?artist=Radiohead` | Listener and play counts, tag names |
+| GET | `/artists/tags?artist=Radiohead&limit=5` | Most-applied tags (usable as genres), with a relative weight |
+| GET | `/artists/albums?artist=Radiohead&limit=10` | Most played albums |
+| GET | `/artists/tracks?artist=Radiohead&limit=10` | Most played tracks |
+| GET | `/albums/info?artist=Radiohead&album=OK Computer` | Listener and play counts, tag names, track list |
+| GET | `/albums/tags?artist=Radiohead&album=OK Computer&limit=5` | Most-applied tags for an album |
+| GET | `/albums/search?album=OK Computer&limit=10` | Search albums by title |
+| GET | `/tracks/info?artist=Radiohead&track=Creep` | Album, duration (seconds), listener and play counts, tag names |
+| GET | `/tracks/similar?artist=Radiohead&track=Creep&limit=10` | Similar tracks, with a 0–1 match score |
+| GET | `/tracks/tags?artist=Radiohead&track=Creep&limit=5` | Most-applied tags for a track |
+| GET | `/tracks/search?track=Creep&artist=Radiohead&limit=10` | Search tracks by title; `artist` is optional |
+| GET | `/tags/top?limit=100&genres_only=true` | Most used tags on Last.fm; `genres_only` drops tags like "seen live" |
+| GET | `/tags/artists?tag=rock&limit=20` | Top artists for a tag (empty list for an unknown tag) |
+
+Every `limit` is 1–100 unless noted. Names go in query parameters, not the path, because they can
+contain `/` (e.g. "AC/DC").
 
 ```sh
 curl "http://127.0.0.1:8000/examples/artists/search?artist=Radiohead"   # no key needed
 curl "http://127.0.0.1:8000/artists/similar?artist=Radiohead&limit=3"
+curl -G "http://127.0.0.1:8000/albums/info" --data-urlencode "artist=Radiohead" --data-urlencode "album=OK Computer"
 curl "http://127.0.0.1:8000/artists/similar/network?artist=Radiohead&limit=3"
 curl "http://127.0.0.1:8000/artists/similar/network?artist=Radiohead&limit=5&depth=3"   # ~77 nodes
 # Names with special characters must be URL-encoded (curl can do it for you):

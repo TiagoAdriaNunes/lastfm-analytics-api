@@ -24,6 +24,7 @@ class LastFMSettings(BaseModel):
     max_retries: int
     retry_backoff: float
     cache_ttl: float
+    cache_size: PositiveInt
     network_max_calls: PositiveInt
 
 
