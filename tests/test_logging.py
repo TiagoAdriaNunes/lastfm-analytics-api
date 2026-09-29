@@ -7,6 +7,7 @@ from loguru import logger
 
 from app.config import get_settings
 from app.logs import InterceptHandler, setup_logging
+from app.services.lastfm import REDACTED, LastFMClient
 from tests.conftest import TEST_SERVICE_API_KEY
 from tests.test_lastfm import MOCK_RESPONSE
 
@@ -199,3 +200,47 @@ def test_uvicorn_access_log_is_silenced():
 
     access = logging.getLogger("uvicorn.access")
     assert not access.hasHandlers()
+
+
+@pytest.mark.parametrize(
+    ("method", "params", "secret"),
+    [
+        ("auth.getSession", {"token": "user-auth-token"}, "user-auth-token"),
+        (
+            "track.scrobble",
+            {"artist": "Radiohead", "track": "Creep", "sk": "session-key"},
+            "session-key",
+        ),
+        ("auth.getMobileSession", {"username": "me", "password": "hunter2"}, "hunter2"),
+    ],
+)
+async def test_user_credentials_are_masked_in_lastfm_logs(
+    lastfm_mock, logs, method, params, secret
+):
+    lastfm_mock.respond(httpx2.Response(200, json=MOCK_RESPONSE))
+    async with httpx2.AsyncClient(
+        base_url="https://ws.audioscrobbler.com/2.0/", transport=lastfm_mock.transport
+    ) as http:
+        await LastFMClient(http, "key", "secret").call(method, **params)
+
+    record = find(logs, f"Last.fm {method} -> 200")
+    assert secret not in repr(record["extra"])
+    assert REDACTED in record["extra"]["params"].values()
+    # Only the credential is masked; the rest still reads like the input.
+    assert record["extra"]["params"].get("artist", "Radiohead") == "Radiohead"
+
+
+def test_json_fields_cannot_overwrite_reserved_keys(capsys):
+    try:
+        setup_logging("INFO", "json")
+        logger.error("Bad {level} value", level="debug", message="fake", logger="x", time="t")
+        entry = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    finally:
+        setup_logging("INFO", "text")
+
+    assert entry["level"] == "error"
+    assert entry["message"] == "Bad debug value"
+    assert entry["logger"] != "x"
+    assert entry["time"] != "t"
+    assert (entry["extra_level"], entry["extra_message"]) == ("debug", "fake")
+    assert (entry["extra_logger"], entry["extra_time"]) == ("x", "t")

@@ -16,6 +16,10 @@ NOT_FOUND_ERROR = 6
 RATE_LIMIT_ERROR = 29
 RETRYABLE_ERRORS = {8, 11, 16, RATE_LIMIT_ERROR}
 SIGNED_METHODS = {"auth.getSession", "track.scrobble"}
+# Last.fm params that are user credentials (auth token, session key, password for
+# auth.getMobileSession): masked in logs, never written out.
+SECRET_PARAMS = {"token", "sk", "password", "authToken"}
+REDACTED = "[redacted]"
 
 # Last.fm decodes the `artist`/`track` params of these methods twice, so a correctly encoded "+"
 # (%2B) turns into a space: "+44" is not found and "Florence + The Machine" silently resolves to
@@ -97,8 +101,8 @@ class LastFMClient:
     async def call(self, method: str, **params: Any) -> dict[str, Any]:
         query = {k: v for k, v in params.items() if v is not None}
         # What the caller asked for, for the logs: taken before `api_key`/`api_sig` are added and
-        # before the "+" pre-encoding, so it's safe to log and reads like the input.
-        log_params = dict(query)
+        # before the "+" pre-encoding, so it reads like the input. User credentials are masked.
+        log_params = {k: REDACTED if k in SECRET_PARAMS else v for k, v in query.items()}
         query |= {"method": method, "api_key": self._api_key, "format": "json"}
         if method in SIGNED_METHODS:
             query["api_sig"] = create_signature(query, self._api_secret)

@@ -33,6 +33,7 @@ INTERCEPTED_LOGGERS = ("uvicorn",)
 SILENCED_LOGGERS = ("uvicorn.access",)
 
 TEXT_FORMAT = "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <7} | {name}: {message}"
+JSON_RESERVED_KEYS = {"time", "level", "logger", "message", "exception"}
 
 
 class InterceptHandler(logging.Handler):
@@ -59,8 +60,11 @@ def _write_json(message: "Message") -> None:
         "level": record["level"].name.lower(),
         "logger": record["name"],
         "message": record["message"],
-        **record["extra"],
     }
+    # A field named like one of the keys above (e.g. `level=`) must not overwrite it, or an error
+    # could show up as "debug" and drop out of `@level:error` filters. Keep it, prefixed.
+    for key, value in record["extra"].items():
+        entry[f"extra_{key}" if key in JSON_RESERVED_KEYS else key] = value
     if (exc := record["exception"]) is not None:
         entry["exception"] = "".join(traceback.format_exception(exc.type, exc.value, exc.traceback))
     _write(json.dumps(entry, default=str, ensure_ascii=False) + "\n")
