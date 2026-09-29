@@ -191,3 +191,11 @@ def test_httpx_and_root_loggers_are_not_intercepted():
     for name in ["", "httpx2"]:
         handlers = logging.getLogger(name).handlers
         assert not any(isinstance(h, InterceptHandler) for h in handlers)
+
+
+def test_uvicorn_access_log_is_silenced():
+    # Uvicorn only writes access lines while this logger has handlers; our middleware replaces it.
+    setup_logging("INFO", "text")
+
+    access = logging.getLogger("uvicorn.access")
+    assert not access.hasHandlers()
